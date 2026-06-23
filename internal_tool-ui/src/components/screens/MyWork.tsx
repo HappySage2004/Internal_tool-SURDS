@@ -1,0 +1,208 @@
+import { useState, useRef, KeyboardEvent } from 'react'
+import {
+  AtSign, UserPlus, GitPullRequest, MessageSquare,
+  ChevronDown, ChevronRight, FileText, Lock, Inbox,
+} from 'lucide-react'
+import { useData } from '../../context/DataContext'
+import type { Task, InboxItemType } from '../../types'
+import { TaskRow } from '../ui/TaskRow'
+import { Badge } from '../ui/Badge'
+
+interface MyWorkProps {
+  onSelectTask: (taskId: string) => void
+  onNewTask: () => void
+}
+
+const InboxIcon = ({ type }: { type: InboxItemType }) => {
+  const size = 15
+  if (type === 'mention')        return <AtSign size={size} className="text-[var(--accent)]" />
+  if (type === 'assignment')     return <UserPlus size={size} className="text-[#2F6FED]" />
+  if (type === 'review_request') return <GitPullRequest size={size} className="text-[#C77700]" />
+  return <MessageSquare size={size} className="text-[var(--text-muted)]" />
+}
+
+function groupTasks(taskList: Task[]) {
+  const today: Task[] = []
+  const thisWeek: Task[] = []
+  const later: Task[] = []
+  const noDate: Task[] = []
+
+  for (const t of taskList) {
+    if (t.dueGroup === 'today')     today.push(t)
+    else if (t.dueGroup === 'this_week') thisWeek.push(t)
+    else if (t.dueGroup === 'later') later.push(t)
+    else noDate.push(t)
+  }
+  return { today, thisWeek, later, noDate }
+}
+
+interface TaskGroupProps {
+  label: string
+  taskList: Task[]
+  onSelectTask: (id: string) => void
+}
+
+function TaskGroup({ label, taskList, onSelectTask }: TaskGroupProps) {
+  const [open, setOpen] = useState(true)
+  if (taskList.length === 0) return null
+
+  return (
+    <div className="mb-1">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors duration-150 w-full"
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <span>{label}</span>
+        <span className="mono text-[11px] text-[var(--text-faint)] ml-1">{taskList.length}</span>
+      </button>
+      {open && (
+        <div>
+          {taskList.map(t => (
+            <TaskRow key={t.id} task={t} onClick={onSelectTask} showSpace />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function MyWork({ onSelectTask, onNewTask }: MyWorkProps) {
+  const { tasks, inboxItems, documents, spacesById, markRead } = useData()
+  const myTasks    = tasks.filter(t => t.assigneeId === 'aaryan' || t.isPersonal)
+  const aaryanDocs = documents.filter(d => d.ownerId === 'aaryan')
+  const [inboxOpen, setInboxOpen] = useState(true)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const unread  = inboxItems.filter(i => !i.read)
+  const grouped = groupTasks(myTasks)
+
+  const handleNewTask = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && newTaskTitle.trim()) {
+      // In a real app, create task. For demo, clear + open QuickCreate
+      setNewTaskTitle('')
+      onNewTask()
+    }
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-6 pt-8 pb-12">
+        {/* Page title */}
+        <h1 className="text-[21px] font-medium text-[var(--text)] mb-6">My work</h1>
+
+        {/* ── Inbox ──────────────────────────────────────────────────── */}
+        <section className="mb-8">
+          <button
+            onClick={() => setInboxOpen(v => !v)}
+            className="flex items-center gap-2 mb-2 group"
+          >
+            <Inbox size={15} className="text-[var(--text-muted)]" />
+            <span className="text-[15px] font-medium text-[var(--text)]">Inbox</span>
+            {unread.length > 0 && (
+              <span className="mono text-[11px] bg-[var(--accent)] text-white px-1.5 py-0.5 rounded-full font-medium">
+                {unread.length}
+              </span>
+            )}
+            <span className="ml-1 text-[var(--text-faint)]">
+              {inboxOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </span>
+          </button>
+
+          {inboxOpen && (
+            <div className="space-y-0.5">
+              {inboxItems.length === 0 ? (
+                <p className="text-[13px] text-[var(--text-faint)] px-3 py-2">
+                  You&apos;re all caught up
+                </p>
+              ) : (
+                inboxItems.map(item => (
+                  <div
+                    key={item.id}
+                    onClick={() => { if (!item.read) markRead(item.id) }}
+                    className={`
+                      flex items-start gap-3 px-3 py-2.5 rounded-[6px] cursor-pointer
+                      transition-all duration-150 hover:bg-[var(--surface)]
+                      ${!item.read ? 'bg-[var(--accent-soft)]/40' : ''}
+                    `}
+                  >
+                    <span className="flex-shrink-0 mt-0.5">
+                      <InboxIcon type={item.type} />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[13px] leading-snug ${!item.read ? 'text-[var(--text)]' : 'text-[var(--text-muted)]'}`}>
+                        {item.text}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="mono text-[11px] text-[var(--text-faint)]">{item.createdAt}</span>
+                        <span className="text-[11px] text-[var(--accent)]">{item.sourceLabel}</span>
+                      </div>
+                    </div>
+                    {!item.read && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] flex-shrink-0 mt-1.5" />
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* ── My tasks ───────────────────────────────────────────────── */}
+        <section className="mb-8">
+          <h2 className="text-[15px] font-medium text-[var(--text)] mb-3">My tasks</h2>
+
+          {/* Add task input */}
+          <div className="flex items-center gap-2 px-3 py-2 mb-3 border border-dashed border-[var(--border)] rounded-[6px] bg-[var(--surface)]">
+            <span className="w-3 h-3 rounded-full border-2 border-[var(--text-faint)] flex-shrink-0" />
+            <input
+              ref={inputRef}
+              value={newTaskTitle}
+              onChange={e => setNewTaskTitle(e.target.value)}
+              onKeyDown={handleNewTask}
+              placeholder="Add a task... personal by default"
+              className="flex-1 text-[13px] bg-transparent outline-none text-[var(--text)] placeholder:text-[var(--text-faint)]"
+            />
+            <Lock size={12} className="text-[var(--text-faint)] flex-shrink-0" />
+          </div>
+
+          <TaskGroup label="Today"     taskList={grouped.today}    onSelectTask={onSelectTask} />
+          <TaskGroup label="This week" taskList={grouped.thisWeek} onSelectTask={onSelectTask} />
+          <TaskGroup label="Later"     taskList={grouped.later}    onSelectTask={onSelectTask} />
+          <TaskGroup label="No date"   taskList={grouped.noDate}   onSelectTask={onSelectTask} />
+        </section>
+
+        {/* ── Recent docs ────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-[15px] font-medium text-[var(--text)] mb-3">Recent docs</h2>
+          <div className="space-y-0.5">
+            {aaryanDocs.map(doc => {
+              const space = doc.spaceId ? spacesById[doc.spaceId] : undefined
+              return (
+                <div
+                  key={doc.id}
+                  className="
+                    flex items-center gap-3 px-3 py-2.5 rounded-[6px] cursor-pointer
+                    hover:bg-[var(--surface)] transition-all duration-150
+                  "
+                >
+                  <FileText size={15} className="text-[var(--text-muted)] flex-shrink-0" />
+                  <span className="flex-1 text-[13px] text-[var(--text)] truncate">{doc.title}</span>
+                  {space ? (
+                    <Badge variant="default">{space.name}</Badge>
+                  ) : (
+                    <Badge variant="muted">
+                      <Lock size={10} />
+                      personal
+                    </Badge>
+                  )}
+                  <span className="mono text-[11px] text-[var(--text-faint)] flex-shrink-0">{doc.updatedAt}</span>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
