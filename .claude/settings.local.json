@@ -1,31 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(Set-Location \"c:\\\\Users\\\\AaryanAwadh\\\\OneDrive - Accordion Partners\\\\Desktop\\\\SURDS Slack\\\\surds-app\"; $job = Start-Job { Set-Location \"c:\\\\Users\\\\AaryanAwadh\\\\OneDrive - Accordion Partners\\\\Desktop\\\\SURDS Slack\\\\surds-app\"; npm run dev 2>&1 }; Start-Sleep -Seconds 5; Receive-Job $job; Stop-Job $job; Remove-Job $job)",
-      "PowerShell($base = \"c:\\\\Users\\\\AaryanAwadh\\\\OneDrive - Accordion Partners\\\\Desktop\\\\SURDS Slack\\\\internal_tool-backend\"; @\\(\"app\\\\routers\",\"app\\\\models\",\"app\\\\schemas\",\"migrations\"\\) | ForEach-Object { New-Item -ItemType Directory -Force \"$base\\\\$_\" | Out-Null }; Write-Output \"Directories created\")",
-      "PowerShell(Get-ChildItem -Recurse \"c:\\\\Users\\\\AaryanAwadh\\\\OneDrive - Accordion Partners\\\\Desktop\\\\SURDS Slack\\\\internal_tool-backend\" -Name | Where-Object { $_ -notmatch \"__pycache__\" } | Sort-Object)",
-      "PowerShell(python -c \"import httpx, json; r = httpx.get\\('http://127.0.0.1:8765/me'\\); print\\(r.status_code\\); print\\(json.dumps\\(r.json\\(\\), indent=2\\)\\)\")",
-      "PowerShell(Get-Process -Name \"uvicorn\" -ErrorAction SilentlyContinue)",
-      "PowerShell(Stop-Process -Force)",
-      "PowerShell(Start-Process -FilePath \"python\" -ArgumentList \"-m\", \"uvicorn\", \"app.main:app\", \"--port\", \"8000\" -WorkingDirectory $backendPath -NoNewWindow -PassThru)",
-      "PowerShell($backendPath = \"c:\\\\Users\\\\AaryanAwadh\\\\OneDrive - Accordion Partners\\\\Desktop\\\\SURDS Slack\\\\internal_tool-backend\")",
-      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/tasks?space_id=auth\" -Method GET)",
-      "PowerShell(Stop-Process -Id 16392 -Force -ErrorAction SilentlyContinue)",
-      "Bash(ls -la \"c:\\\\Users\\\\AaryanAwadh\\\\OneDrive - Accordion Partners\\\\Desktop\\\\SURDS Slack\\\\\")",
-      "Read(//c/Users/AaryanAwadh/OneDrive - Accordion Partners/Desktop/**)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\AaryanAwadh\\\\OneDrive - Accordion Partners\\\\Desktop\\\\SURDS Slack\\\\internal_tool-ui\\\\\" -Recurse | Where-Object { $_.Extension -in '.tsx', '.ts' } | Select-Object FullName | Sort-Object FullName)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\AaryanAwadh\\\\OneDrive - Accordion Partners\\\\Desktop\\\\SURDS Slack\\\\internal_tool-ui\\\\src\\\\\" -Recurse | Where-Object { $_.Extension -in '.tsx', '.ts' } | Select-Object FullName | Sort-Object FullName)",
-      "Bash(curl -s http://localhost:8000/users)",
-      "Bash(curl -s http://localhost:8000/meetings)",
-      "Bash(npx tsc *)",
-      "Bash(curl -s -X POST http://localhost:8000/meetings -H \"Content-Type: application/json\" -H \"X-User-Id: aaryan\" -d '{\"title\":\"Test mtg verify\",\"scheduled_at\":\"2026-07-01\",\"attendee_ids\":[\"aaryan\",\"maaz\"],\"action_items\":[{\"text\":\"Draft agenda\"},{\"text\":\"Book room\"}]}')",
-      "Bash(python -m json.tool)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X DELETE http://localhost:8000/meetings/44844e88-c702-44f5-a078-4baff57a9212)",
-      "Bash(curl -s -X POST http://localhost:8000/tasks -H \"Content-Type: application/json\" -H \"X-User-Id: aaryan\" -d '{\"title\":\"Space task verify\",\"space_id\":\"auth\",\"status\":\"todo\"}')",
-      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('id=',d['id'],'space=',d['space_id'],'status=',d['status']\\)\")",
-      "Bash(python -c ' *)",
-      "Bash(curl -s -X POST http://localhost:8000/tasks -H \"Content-Type: application/json\" -H \"X-User-Id: aaryan\" -d '{\"title\":\"Space+assignee verify\",\"space_id\":\"auth\",\"status\":\"todo\",\"assignee_id\":\"maaz\"}')",
-      "Bash(python -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\('id=',d.get\\('id'\\),'space=',d.get\\('space_id'\\),'assignee=',d.get\\('assignee_id'\\)\\)\")"
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash(*)"
     ]
   }
 }
