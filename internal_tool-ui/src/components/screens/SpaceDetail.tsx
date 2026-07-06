@@ -1,14 +1,16 @@
 import { useState, useEffect, type MouseEvent as ReactMouseEvent } from 'react'
-import { GitBranch, GitPullRequest, GitMerge, Plus, Code2, FileText, X } from 'lucide-react'
+import { GitBranch, GitPullRequest, GitMerge, Plus, Code2, FileText, X, ExternalLink } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import * as apiClient from '../../api'
-import type { Task, TaskStatus, GitLink, ThreadPost } from '../../types'
+import { getLinkProvider } from '../../lib/linkProvider'
+import type { Task, TaskStatus, GitLink, ThreadPost, Document } from '../../types'
 import { Avatar } from '../ui/Avatar'
 import { HealthDot } from '../ui/HealthDot'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { TaskRow } from '../ui/TaskRow'
 import { ThreadFeed } from '../ui/ThreadFeed'
+import { DocumentViewer } from '../panels/DocumentViewer'
 
 interface SpaceDetailProps {
   spaceId: string
@@ -50,16 +52,22 @@ const RAIL_MIN = 240
 const RAIL_MAX = 640
 
 export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
-  const { spaces, tasks: myTasks, taskOverrides, usersById, goalsById, documents, threadPostsBySpaceId, addPost, refreshSpaceTasks } = useData()
+  const { spaces, tasks: myTasks, taskOverrides, usersById, goalsById, documents, threadPostsBySpaceId, addPost, addDocument, refreshSpaceTasks } = useData()
   const [spaceTasks, setSpaceTasks] = useState<typeof myTasks>([])
-  const [docsOpen, setDocsOpen] = useState(true)
   const [showPostModal, setShowPostModal] = useState(false)
   const [postBody, setPostBody] = useState('')
   const [postHealth, setPostHealth] = useState<'on_track' | 'at_risk' | 'off_track'>('on_track')
   const [localPosts, setLocalPosts] = useState<ThreadPost[]>([])
-  const [railWidth, setRailWidth] = useState(340)
+  const [railWidth, setRailWidth] = useState(360)
   const [addingTask, setAddingTask] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [showLinkModal, setShowLinkModal] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkTitle, setLinkTitle] = useState('')
+  const [showDocModal, setShowDocModal] = useState(false)
+  const [docTitle, setDocTitle] = useState('')
+  const [viewerDoc, setViewerDoc] = useState<Document | null>(null)
+  const [viewerEditing, setViewerEditing] = useState(false)
 
   function handleRailResizeMouseDown(e: ReactMouseEvent<HTMLDivElement>) {
     e.preventDefault()
@@ -129,6 +137,41 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
     }
   }
 
+  const handleAddDoc = async () => {
+    // Title is optional — defaults to "Untitled" per design §3.
+    const title = docTitle.trim() || 'Untitled'
+    setDocTitle('')
+    setShowDocModal(false)
+    try {
+      const raw = await apiClient.createDocument({ title, space_id: spaceId, doc_type: 'note', content: '' })
+      const doc = apiClient.mapDocument(raw)
+      addDocument(doc)
+      // Open the new doc straight into edit mode so the user can write.
+      setViewerEditing(true)
+      setViewerDoc(doc)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleAddLink = async () => {
+    const url = linkUrl.trim()
+    if (!url) return
+    // Fall back to the host as a title if none was given.
+    let fallback = url
+    try { fallback = new URL(url).hostname.replace(/^www\./, '') } catch { /* keep raw url */ }
+    const title = linkTitle.trim() || fallback
+    setLinkUrl('')
+    setLinkTitle('')
+    setShowLinkModal(false)
+    try {
+      const raw = await apiClient.createDocument({ title, space_id: spaceId, url })
+      addDocument(apiClient.mapDocument(raw))
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const handleSendPost = async (body: string) => {
     const optimistic: ThreadPost = { id: `local-${Date.now()}`, spaceId, authorId: 'aaryan', kind: 'message', body, createdAt: 'just now' }
     setLocalPosts(prev => [...prev, optimistic])
@@ -157,17 +200,12 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
         <div className="px-6 pt-8 pb-12">
           {/* Space header */}
           <div className="mb-6">
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <div className="flex items-center gap-3">
-                <HealthDot health={health} size={10} />
-                <h1 className="text-[21px] font-medium text-[var(--text)]">{space.name}</h1>
-                <Badge variant={space.mode === 'engineering' ? 'accent' : 'default'}>
-                  {space.mode === 'engineering' ? 'engineering' : 'workstream'}
-                </Badge>
-              </div>
-              <Button variant="primary" size="sm" onClick={() => setShowPostModal(true)}>
-                Post update
-              </Button>
+            <div className="flex items-center gap-3 mb-3">
+              <HealthDot health={health} size={10} />
+              <h1 className="text-[21px] font-medium text-[var(--text)]">{space.name}</h1>
+              <Badge variant={space.mode === 'engineering' ? 'accent' : 'default'}>
+                {space.mode === 'engineering' ? 'engineering' : 'workstream'}
+              </Badge>
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
@@ -252,7 +290,67 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
         </div>
       </div>
 
-      {/* Right rail */}
+      {/* Docs column */}
+      <div className="hidden lg:flex flex-col border-l border-[var(--border)] overflow-hidden" style={{ width: 280 }}>
+        <div className="px-4 py-3 border-b border-[var(--border)]">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Docs</span>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          {spaceDocs.length === 0 ? (
+            <p className="text-[12px] text-[var(--text-faint)] py-1">No docs yet.</p>
+          ) : (
+            <div className="space-y-0.5 mb-3">
+              {spaceDocs.map(doc => {
+                if (doc.url) {
+                  const provider = getLinkProvider(doc.url)
+                  const Icon = provider.icon
+                  return (
+                    <a
+                      key={doc.id}
+                      href={doc.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={`${provider.label} · ${doc.url}`}
+                      className="group flex items-center gap-2 py-1.5 cursor-pointer hover:text-[var(--text)] transition-colors duration-150"
+                    >
+                      <Icon size={13} className="flex-shrink-0" style={{ color: provider.color }} />
+                      <span className="flex-1 text-[13px] text-[var(--text)] truncate">{doc.title}</span>
+                      <ExternalLink size={11} className="text-[var(--text-faint)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0" />
+                    </a>
+                  )
+                }
+                return (
+                  <button
+                    key={doc.id}
+                    onClick={() => { setViewerEditing(false); setViewerDoc(doc) }}
+                    className="w-full flex items-center gap-2 py-1.5 cursor-pointer hover:text-[var(--text)] transition-colors duration-150 text-left"
+                  >
+                    <FileText size={13} className="text-[var(--text-muted)] flex-shrink-0" />
+                    <span className="flex-1 text-[13px] text-[var(--text)] truncate">{doc.title}</span>
+                    <span className="mono text-[11px] text-[var(--text-faint)]">{doc.updatedAt}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowDocModal(true)}
+              className="text-[12px] text-[var(--accent)] hover:underline transition-colors duration-150"
+            >
+              + New doc
+            </button>
+            <button
+              onClick={() => setShowLinkModal(true)}
+              className="text-[12px] text-[var(--accent)] hover:underline transition-colors duration-150"
+            >
+              + New link
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Thread column */}
       <div
         className="relative hidden md:flex flex-col border-l border-[var(--border)] overflow-hidden"
         style={{ width: railWidth, minWidth: RAIL_MIN }}
@@ -262,52 +360,22 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
           onMouseDown={handleRailResizeMouseDown}
           className="absolute left-0 top-0 h-full w-[4px] cursor-col-resize hover:bg-[var(--accent)]/20 transition-colors duration-150 z-10"
         />
-        {/* Docs section (collapsible) */}
-        <div className="border-b border-[var(--border)]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Thread</span>
           <button
-            onClick={() => setDocsOpen(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors duration-150"
+            onClick={() => setShowPostModal(true)}
+            className="flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline transition-colors duration-150"
           >
-            <span className="uppercase tracking-wider text-[11px]">Docs</span>
-            <span className="text-[var(--text-faint)]">{docsOpen ? '−' : '+'}</span>
+            <Plus size={13} />
+            Update
           </button>
-          {docsOpen && (
-            <div className="px-4 pb-3">
-              {spaceDocs.length === 0 ? (
-                <p className="text-[12px] text-[var(--text-faint)] py-1">No docs yet.</p>
-              ) : (
-                <div className="space-y-0.5 mb-2">
-                  {spaceDocs.map(doc => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center gap-2 py-1.5 cursor-pointer hover:text-[var(--text)] transition-colors duration-150"
-                    >
-                      <FileText size={13} className="text-[var(--text-muted)] flex-shrink-0" />
-                      <span className="flex-1 text-[13px] text-[var(--text)] truncate">{doc.title}</span>
-                      <span className="mono text-[11px] text-[var(--text-faint)]">{doc.updatedAt}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button className="text-[12px] text-[var(--accent)] hover:underline transition-colors duration-150">
-                + New doc
-              </button>
-            </div>
-          )}
         </div>
-
-        {/* Thread section */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="px-4 py-3 border-b border-[var(--border)]">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Thread</span>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <ThreadFeed
-              posts={threadPostsData}
-              onSend={handleSendPost}
-              compact
-            />
-          </div>
+        <div className="flex-1 overflow-hidden">
+          <ThreadFeed
+            posts={threadPostsData}
+            onSend={handleSendPost}
+            compact
+          />
         </div>
       </div>
 
@@ -363,6 +431,105 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
             </div>
           </div>
         </>
+      )}
+
+      {/* New doc modal */}
+      {showDocModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/20 z-40"
+            onClick={() => setShowDocModal(false)}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] w-full max-w-md shadow-xl">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+                <h3 className="text-[15px] font-medium text-[var(--text)]">New doc — {space.name}</h3>
+                <button
+                  onClick={() => setShowDocModal(false)}
+                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[rgba(18,18,28,0.06)] transition-all duration-150"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <p className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider mb-2">Title <span className="normal-case text-[var(--text-faint)]">(optional)</span></p>
+                  <input
+                    autoFocus
+                    value={docTitle}
+                    onChange={e => setDocTitle(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddDoc() }}
+                    placeholder="Untitled"
+                    className="w-full text-[13px] text-[var(--text)] bg-transparent border border-[var(--border)] rounded-[6px] px-3 py-2 placeholder:text-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#5B57E0] transition-all duration-150"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setShowDocModal(false)}>Cancel</Button>
+                  <Button variant="primary" size="sm" onClick={handleAddDoc}>Create doc</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Add link modal */}
+      {showLinkModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/20 z-40"
+            onClick={() => setShowLinkModal(false)}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] w-full max-w-md shadow-xl">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+                <h3 className="text-[15px] font-medium text-[var(--text)]">Add link — {space.name}</h3>
+                <button
+                  onClick={() => setShowLinkModal(false)}
+                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[rgba(18,18,28,0.06)] transition-all duration-150"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <p className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider mb-2">URL</p>
+                  <input
+                    autoFocus
+                    value={linkUrl}
+                    onChange={e => setLinkUrl(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddLink() }}
+                    placeholder="https://docs.google.com/…"
+                    className="w-full text-[13px] text-[var(--text)] bg-transparent border border-[var(--border)] rounded-[6px] px-3 py-2 placeholder:text-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#5B57E0] transition-all duration-150"
+                  />
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider mb-2">Title <span className="normal-case text-[var(--text-faint)]">(optional)</span></p>
+                  <input
+                    value={linkTitle}
+                    onChange={e => setLinkTitle(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddLink() }}
+                    placeholder="Defaults to the link's domain"
+                    className="w-full text-[13px] text-[var(--text)] bg-transparent border border-[var(--border)] rounded-[6px] px-3 py-2 placeholder:text-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#5B57E0] transition-all duration-150"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setShowLinkModal(false)}>Cancel</Button>
+                  <Button variant="primary" size="sm" onClick={handleAddLink}>Add link</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Document viewer / editor */}
+      {viewerDoc && (
+        <DocumentViewer
+          doc={viewerDoc}
+          initialEditing={viewerEditing}
+          onClose={() => setViewerDoc(null)}
+        />
       )}
     </div>
   )

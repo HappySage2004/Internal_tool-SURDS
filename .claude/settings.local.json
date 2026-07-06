@@ -6,7 +6,23 @@
       "Write",
       "Glob",
       "Grep",
-      "Bash(*)"
+      "Bash(*)",
+      "Bash(npx tsc *)",
+      "Bash(npm install *)",
+      "Bash(python -c \"import ast,sys; [ast.parse\\(open\\(f,encoding='utf-8'\\).read\\(\\),f\\) for f in ['app/config.py','app/doc_files.py','app/schemas/schemas.py','app/routers/documents.py']]; print\\('syntax ok'\\)\")",
+      "Bash(python -c \"import fastapi, uvicorn, pydantic_settings; print\\('deps ok'\\)\")",
+      "Bash(uvicorn app.main:app --port 8000 --log-level warning)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(break)",
+      "Bash(curl -s -X POST http://localhost:8000/documents -H \"Content-Type: application/json\" -d '{\"title\":\"Test render\",\"space_id\":\"auth\",\"doc_type\":\"note\",\"content\":\"# Hello\\\\n\\\\nSome **bold** text and a list:\\\\n\\\\n- one\\\\n- two\\\\n\\\\n```js\\\\nconst x = 1\\\\n```\"}')",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s http://localhost:8000/documents/7700ffe7-bb9f-4275-8578-397ed0e11362)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('content len:', len\\(d['content']\\)\\); print\\(repr\\(d['content'][:30]\\)\\)\")",
+      "Bash(curl -s -X POST http://localhost:8000/documents -H \"Content-Type: application/json\" -d '{\"title\":\"Sheet\",\"space_id\":\"auth\",\"url\":\"https://docs.google.com/spreadsheets/d/x\"}')",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('id:', d['id'], 'url:', d['url'], 'content:', repr\\(d['content']\\)\\)\")",
+      "Bash(curl -s -X PATCH http://localhost:8000/documents/7700ffe7-bb9f-4275-8578-397ed0e11362 -H \"Content-Type: application/json\" -d '{\"content\":\"# Edited\\\\n\\\\nnew body\"}')",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(repr\\(d['content']\\)\\)\")",
+      "Bash(npm run *)"
     ]
   }
 }

@@ -10,7 +10,7 @@ interface RawSpace  { id: string; name: string; mode: string; ownerId?: string; 
 interface RawGitLink { refType: string; url: string; externalId?: string; state?: string }
 interface RawComment { id: string; authorId: string; body: string; parentCommentId?: string; createdAt: string; editedAt?: string | null }
 interface RawTask   { id: string; key?: string; spaceId?: string; title: string; status: string; description?: string; assigneeId?: string; priority?: string; dueDate?: string; tagSpaceId?: string; gitLinks: RawGitLink[]; comments: RawComment[]; createdBy?: string; createdAt: string; updatedAt: string; completedAt?: string }
-interface RawDoc    { id: string; title: string; ownerId: string; spaceId?: string; docType?: string; content: string; linkedTaskIds: string[]; createdAt: string; updatedAt: string; archivedAt?: string }
+interface RawDoc    { id: string; title: string; ownerId: string; spaceId?: string; docType?: string; content: string; url?: string; linkedTaskIds: string[]; createdAt: string; updatedAt: string; archivedAt?: string }
 interface RawPost   { id: string; spaceId: string | null; authorId: string; kind: string; body: string; health?: string; parentPostId?: string; periodLabel?: string; createdAt: string }
 interface RawInbox  { id: string; userId: string; type: string; taskId?: string; documentId?: string; postId?: string; readAt?: string; createdAt: string }
 interface RawMeetingAI { id: string; text: string; done: boolean; taskId?: string }
@@ -111,6 +111,8 @@ export function mapDocument(d: RawDoc): Document {
     spaceId: d.spaceId ?? undefined,
     docType: d.docType as Document['docType'],
     updatedAt: formatRelative(d.updatedAt),
+    content: d.content,
+    url: d.url ?? undefined,
   }
 }
 
@@ -179,6 +181,15 @@ export const getPostsBySpace = (spaceId: string | null) =>
 export const getMyWork      = () => get<RawTask[]>('/tasks/my-work')
 export const getTasksBySpace = (spaceId: string) => get<RawTask[]>(`/tasks?space_id=${spaceId}`)
 export const getDocuments   = () => get<RawDoc[]>('/documents')
+export const getDocument    = (docId: string) => get<RawDoc>(`/documents/${docId}`)
+
+export const createDocument = (body: {
+  title?: string; space_id?: string; doc_type?: string; content?: string; url?: string;
+}) => post<RawDoc>('/documents', body)
+
+export const updateDocument = (docId: string, body: {
+  title?: string; content?: string; doc_type?: string; space_id?: string; url?: string;
+}) => patch<RawDoc>(`/documents/${docId}`, body)
 export const getInbox       = () => get<RawInbox[]>('/inbox')
 export const getMeetings    = () => get<RawMeeting[]>('/meetings')
 

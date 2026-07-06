@@ -38,6 +38,8 @@ internal_tool-backend/local_DB/*.json
 # Uploaded markdown / PDF / image bytes
 internal_tool-backend/uploads/
 uploads/
+# Document markdown bodies (one .md per doc), written at runtime
+Documents_Stage/
 
 # ─── Logs ───────────────────────────────────────────────────
 *.log

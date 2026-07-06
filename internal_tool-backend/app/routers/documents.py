@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_current_user, get_store
+from app.doc_files import delete_document_file, read_document_content, write_document_file
 from app.repositories.store import Store
 from app.schemas.schemas import CommentIn, CommentOut, DocumentCreate, DocumentOut, DocumentUpdate
 
@@ -19,6 +20,15 @@ def _check_visibility(doc: dict, current_user_id: str) -> bool:
     if doc.get("space_id") is not None:
         return True                             # shared doc — everyone can see it
     return doc.get("owner_id") == current_user_id  # personal — owner only
+
+
+def _with_content(doc: dict) -> dict:
+    """Attach the markdown body from the staged file, falling back to any
+    inline `content` on the stored record (covers seed data with no file)."""
+    body = read_document_content(doc["id"])
+    if body is None:
+        body = doc.get("content", "")
+    return {**doc, "content": body}
 
 
 # ---------------------------------------------------------------------------
@@ -48,7 +58,7 @@ async def list_documents(
     if owner_id is not None:
         docs = [d for d in docs if d.get("owner_id") == owner_id]
 
-    return docs
+    return [_with_content(d) for d in docs]
 
 
 @router.post("", response_model=DocumentOut, status_code=201)
@@ -62,6 +72,9 @@ async def create_document(
     if data.get("doc_type") is not None and hasattr(data["doc_type"], "value"):
         data["doc_type"] = data["doc_type"].value
 
+    # The markdown body is stored on disk, not in the collection record.
+    content = data.pop("content", "") or ""
+
     now = datetime.now(timezone.utc).isoformat()
     doc = {
         "id": str(uuid4()),
@@ -74,7 +87,11 @@ async def create_document(
         "updated_at": now,
         "archived_at": None,
     }
-    return await store.documents.insert(doc)
+    stored = await store.documents.insert(doc)
+    # Bookmarks (url set) have no body → no staged file.
+    if not stored.get("url"):
+        write_document_file(stored, content)
+    return _with_content(stored)
 
 
 @router.get("/{doc_id}", response_model=DocumentOut)
@@ -86,7 +103,7 @@ async def get_document(
     doc = await store.documents.get(doc_id)
     if not doc or doc.get("archived_at") is not None or not _check_visibility(doc, current_user["id"]):
         raise HTTPException(status_code=404, detail="Document not found")
-    return doc
+    return _with_content(doc)
 
 
 @router.patch("/{doc_id}", response_model=DocumentOut)
@@ -105,9 +122,15 @@ async def update_document(
     if "doc_type" in changes and hasattr(changes["doc_type"], "value"):
         changes["doc_type"] = changes["doc_type"].value
 
+    # Content edits go to the staged file, not the collection record.
+    content = changes.pop("content", None)
+
     now = datetime.now(timezone.utc).isoformat()
     changes["updated_at"] = now
-    return await store.documents.update(doc_id, changes)
+    updated = await store.documents.update(doc_id, changes)
+    if content is not None and updated is not None and not updated.get("url"):
+        write_document_file(updated, content)
+    return _with_content(updated)
 
 
 @router.delete("/{doc_id}", status_code=204)

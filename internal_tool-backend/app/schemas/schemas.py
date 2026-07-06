@@ -254,6 +254,7 @@ class DocumentCreate(BaseModel):
     space_id: Optional[str] = None
     doc_type: Optional[DocType] = None
     content: str = ""
+    url: Optional[str] = None            # external link (bookmark); no bytes stored
 
 
 class DocumentUpdate(BaseModel):
@@ -261,6 +262,7 @@ class DocumentUpdate(BaseModel):
     content: Optional[str] = None
     doc_type: Optional[DocType] = None
     space_id: Optional[str] = None
+    url: Optional[str] = None
 
 
 class DocumentOut(BaseModel):
@@ -270,6 +272,7 @@ class DocumentOut(BaseModel):
     space_id: Optional[str] = None
     doc_type: Optional[str] = None
     content: str
+    url: Optional[str] = None
     linked_task_ids: list[str] = []
     comments: list[CommentOut] = []
     created_at: str

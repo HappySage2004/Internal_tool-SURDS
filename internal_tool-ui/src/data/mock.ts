@@ -335,6 +335,12 @@ export const documents: Document[] = [
   { id: 'doc-board', title: 'Q3 board deck', ownerId: 'aaryan', spaceId: undefined, docType: 'note', updatedAt: '1d ago' },
   { id: 'doc-2', title: 'Q3 hiring plan draft', ownerId: 'aaryan', spaceId: 'ops', docType: 'note', updatedAt: '1d ago' },
   { id: 'doc-3', title: 'Auth architecture notes', ownerId: 'aaryan', spaceId: 'auth', docType: 'note', updatedAt: '3d ago' },
+  // External links (bookmarks — only the URL is stored, no bytes)
+  { id: 'lnk-auth-figma', title: 'Login flow — Figma', ownerId: 'mara', spaceId: 'auth', updatedAt: '4h ago', url: 'https://www.figma.com/file/abc123/Login-flow' },
+  { id: 'lnk-pay-budget', title: 'Payments budget FY25', ownerId: 'devon', spaceId: 'payments', updatedAt: '1d ago', url: 'https://docs.google.com/spreadsheets/d/1a2b3c/edit' },
+  { id: 'lnk-pay-brief', title: 'Checkout launch brief', ownerId: 'devon', spaceId: 'payments', updatedAt: '2d ago', url: 'https://docs.google.com/document/d/9z8y7x/edit' },
+  { id: 'lnk-infra-runbook', title: 'Incident runbook', ownerId: 'mara', spaceId: 'infra', updatedAt: '5d ago', url: 'https://www.notion.so/team/Incident-runbook-abcdef' },
+  { id: 'lnk-ops-deck', title: 'Q3 all-hands deck', ownerId: 'priya', spaceId: 'ops', updatedAt: '1d ago', url: 'https://docs.google.com/presentation/d/5t6u7v/edit' },
 ]
 
 // ─── Meetings ─────────────────────────────────────────────────────────────────

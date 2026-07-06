@@ -34,6 +34,8 @@ interface DataState {
   // Optimistic mutations
   addTask:         (task: Task) => void
   updateTask:      (taskId: string, updates: Partial<Task>) => void
+  addDocument:     (doc: Document) => void
+  updateDocument:  (docId: string, updates: Partial<Document>) => void
   addPost:         (post: ThreadPost) => void
   markRead:        (inboxId: string) => void
   markAllRead:     () => void
@@ -122,6 +124,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setTaskOverrides(prev => ({ ...prev, [taskId]: { ...prev[taskId], ...updates } }))
   }, [])
 
+  const addDocument = useCallback((doc: Document) => {
+    setDocuments(prev => [doc, ...prev])
+  }, [])
+
+  const updateDocument = useCallback((docId: string, updates: Partial<Document>) => {
+    setDocuments(prev => prev.map(d => d.id === docId ? { ...d, ...updates } : d))
+  }, [])
+
   const addPost = useCallback((post: ThreadPost) => {
     setThreadPosts(prev => [...prev, post])
     // If it's a status post, update the space's latestStatusPost
@@ -174,7 +184,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     tasks, tasksById, taskOverrides, documents, inboxItems, meetings, meetingsById,
     threadPosts, threadPostsBySpaceId,
     loading, error,
-    addTask, updateTask, addPost, markRead, markAllRead,
+    addTask, updateTask, addDocument, updateDocument, addPost, markRead, markAllRead,
     addMeeting, updateMeeting, refreshSpaceTasks,
   }
 

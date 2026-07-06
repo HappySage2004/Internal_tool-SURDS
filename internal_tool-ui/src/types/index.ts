@@ -88,6 +88,12 @@ export interface Document {
   spaceId?: string
   updatedAt: string
   docType?: DocType
+  /** Markdown body. Undefined until the doc is opened (list responses carry it,
+   *  but it may be lazily fetched for a single doc). Empty for link bookmarks. */
+  content?: string
+  /** External link (Google Sheets/Docs, Figma, Notion, …). When set, this
+   *  Document is a bookmark — only the URL is stored, no bytes. */
+  url?: string
 }
 
 export interface ActionItem {

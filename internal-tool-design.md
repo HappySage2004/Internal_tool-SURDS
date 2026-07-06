@@ -251,7 +251,9 @@ Each collection below is, in the interim, a JSON file under `local_DB/` containi
   "owner_id": "user_id",                    // required
   "space_id": "space_id|null",              // null = PERSONAL doc, private to owner
   "doc_type": "note|spec|decision_log|null",
-  "content": "markdown",                    // default ""
+  "url": "string|null",                     // external link (Google Sheets/Docs, Figma, Notion, …); when set, the doc is a bookmark — only the URL is stored, no bytes. Does NOT relax the attachment kinds in §3/§6.
+  "content": "markdown",                    // default ""; body is stored on disk as Documents_Stage/<id>.md (one file per doc, at repo root) and injected into responses — link docs (url set) have no file
+
   "linked_task_ids": ["task_id"],           // bidirectional spec <-> issues
   "comments": [ /* same shape as task comments */ ],
   "attachments": [ { "kind": "markdown|pdf|image", "storage_key": "string", "filename": "string|null" } ],
