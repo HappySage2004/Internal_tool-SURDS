@@ -71,7 +71,7 @@ Status / health palette (used as pills and dots):
 - Task rows ~38px tall. Internal gaps 8/12/16px; section rhythm 16–24px.
 - Icons: outline line icons (Lucide/Tabler style), 16–18px, inheriting text color.
 - Motion: 120–160ms ease on hovers and inserts; subtle. Respect `prefers-reduced-motion`.
-- **Use the width.** Content is left-aligned against the sidebar, never floated in a narrow centered column with dead margins on both sides. The spaces list and space detail use a two-pane layout — primary content on the left, a ~340px right rail (docs + thread) on the right — so the horizontal space is never wasted.
+- **Use the width.** Content is left-aligned against the sidebar, never floated in a narrow centered column with dead margins on both sides. The spaces hub and space detail use a **multi-column** layout — primary content on the left, then two right columns that are always visible: a **Docs column** (~280–300px) and a **Thread column** (~340px, resizable) — so the horizontal space is never wasted. Columns collapse progressively on narrower screens (Docs hides first, then the thread).
 
 ### Avoid (these read as AI-default — don't reach for them)
 Warm cream background + high-contrast serif + terracotta accent. Near-black + acid-green/neon. Broadsheet hairline-newspaper columns. None fit a fast internal tool.
@@ -83,11 +83,11 @@ A **slim left sidebar** (scannable, always visible on desktop; collapsible on ta
 - Workspace name + a prominent **New task** affordance (also ⌘K / C).
 - **My work** — the default landing screen.
 - **Goals**
-- **Spaces** — opens the **org hub**, a single screen with two tabs: **Spaces** and **Docs** (see §6.B). Below this nav item, the individual spaces are listed, grouped into *Engineering* and *Workstreams* with a small health dot each, for direct navigation.
+- **Spaces** — opens the **org hub**, a single three-column screen (Spaces · Docs · General thread — see §6.B). Below this nav item, the individual spaces are listed, grouped into *Engineering* and *Workstreams* with a small health dot each, for direct navigation.
 - **Meetings** — its own top-level area, a sibling of Spaces (see §6.I).
 - Bottom: user avatar → settings.
 
-There is no separate Docs nav item — documents live under the Spaces → Docs tab, and ⌘K jumps to any doc instantly, so the consolidation costs power users nothing.
+There is no separate Docs nav item — documents live in the Docs column of the Spaces hub (and each Space), and ⌘K jumps to any doc instantly, so the consolidation costs power users nothing.
 
 A **command palette (⌘K)** overlays everything: jump to a space/task/doc, create things, change a status — all keyboard-driven.
 
@@ -100,25 +100,22 @@ The daily driver. A lens over everything, in three stacked sections:
 2. **My tasks** — a pinned inline "add task" input at the top (type + Enter → creates a *personal* task by default here). Below it, tasks grouped by **Today / This week / Later / No date**. Each row: status dot, title, then either a **space tag** (shared task) or a **private badge** (personal task) — a personal task may also show a muted optional tag like `· Payments`. Show a priority flag only if set. Shared and personal tasks live in the same list, visually distinguished only by the tag/badge.
 3. **Recent docs** — compact list: title + edited timestamp.
 
-### B. Spaces hub (tabs: Spaces · Docs)
-The **Spaces** nav item opens an org-level hub with two tabs across the top. These replace the old All / Engineering / Workstreams filter tabs — the list is already grouped by mode, so those filters were redundant. (Meetings is **not** here — it's its own top-level area; see §6.I.)
+### B. Spaces hub (three columns: Spaces · Docs · General thread)
+The **Spaces** nav item opens an org-level hub. There are **no tabs** — the screen is three always-visible columns, mirroring the Space-detail layout so the hub reads as the "company space." (Meetings is **not** here — it's its own top-level area; see §6.I.)
 
-**Spaces tab** — a two-pane layout.
-- *Main column:* every space under *Engineering* and *Workstreams* section headers (no filter tabs). Each row: name, mode chip, owner avatar, the Goal chips it ladders into, and a health dot + "updated 2d" from its latest status post. A **New space** action.
-- *Right rail — General thread:* the one company-wide conversation (announcements, cross-team discussion, wins). Feed-plus-composer, async only, a single thread — deliberately not a channel system. This rail appears on the Spaces tab only; the Docs tab uses full width.
-
-**Docs tab** — the former standalone Docs screen, folded in here. All documents the user can see, full width: rows with title, a type icon (note / spec / decision log), the owning space or a **private** badge, owner avatar, and edited timestamp. Grouped by space with a **Personal** group at the bottom (`space_id IS NULL` docs), plus a quick filter. A **New doc** action; selecting a doc opens the document view (screen G).
+- **Main column — Spaces:** every space under *Engineering* and *Workstreams* section headers (no filter tabs — the list is already grouped by mode). Rows are **info-rich cards**, not thin lines, so the short list (≤10 spaces) fills the height with signal: health dot + name + mode chip, a one-line **latest status-post excerpt** (or "No updates yet"), the Goal chips it ladders into, a mono **doc count**, owner avatar, and a mono "updated 2d". A **New space** action.
+- **Docs column (~300px):** all documents the user can see, grouped by space with a **Personal** group (`space_id IS NULL` docs). Each row: type icon (note / spec / decision log) — or a **provider icon** for external links (see screen G) — title, and edited timestamp. A **New doc** action creates an untitled doc and opens it in the editor (screen G). Selecting a file-doc opens the document view; an external-link doc opens its URL in a new tab.
+- **General thread column (~340px, resizable):** the one company-wide conversation (announcements, cross-team discussion, wins). Feed-plus-composer, async only, a single thread — deliberately not a channel system.
 
 ### C. Space detail
-A **two-pane layout** that fills the width — no tabs, nothing hidden behind a click.
-- **Header:** space name, mode chip, owner, Goal chips, a **Post update** button. Workstreams also show their cadence (e.g., "Weekly update").
+A **multi-column layout** that fills the width — no tabs, nothing hidden behind a click.
+- **Header:** space name, mode chip, owner, Goal chips. Workstreams also show their cadence (e.g., "Weekly update"). *(The **Post update** action lives in the Thread column header, not here — see below.)*
 - **Main column (left, aligned next to the sidebar):** the **task list**, grouped by the five statuses.
   - *Engineering variant:* rows show a mono **task key** (`AUTH-214`) and, where relevant, a **git badge** (branch / PR open / merged). Merged PRs render the task as done.
   - *Workstream variant:* same list, no task keys or git badges; recurring tasks carry a small repeat icon. Simpler and calmer.
-- **Right rail (~340px, fills the previously-empty space):** two stacked sections, both always visible — no click to reach them.
-  - **Docs** (top, compact, collapsible): the space's documents as a short list — title + edited timestamp. Clicking one opens the full document view (screen G). A small **New doc** action.
-  - **Thread** (below — the space's conversation, formerly "Updates"): a reverse-chron feed with a composer at the bottom. Two post kinds — a plain **message**, and a **status post** (created by the header's **Post update** button) which carries a **health pill**. The latest status post is what the Goals rollup reads, so renaming to Thread does not break the founder view. Posts show author, mono timestamp, and markdown body; messages support short replies.
-- **Interactions:** opening a task slides the **task detail panel** in over the right rail — task-level comments live there, separate from the space Thread. On tablet the rail collapses to two icon toggles (docs, thread) that open it as an overlay.
+- **Docs column (~280px):** the space's documents — title + edited timestamp, or a **provider icon** + title for external links. Clicking a file-doc opens the full document view (screen G); an external-link doc opens its URL in a new tab. Footer actions: **+ New doc** (opens the editor) and **+ New link** (paste a URL — Google Sheets/Docs, Figma, Notion, …; only the link is stored, no bytes).
+- **Thread column (~340px, resizable — the space's conversation, formerly "Updates"):** a reverse-chron feed with a composer at the bottom. Its header carries the **+ Update** action (this is what was formerly the header's "Post update" button). Two post kinds — a plain **message** (composer at the bottom), and a **status post** (created by **+ Update**) which carries a **health pill**. The latest status post is what the Goals rollup reads, so renaming to Thread does not break the founder view. Posts show author, mono timestamp, and markdown body; messages support short replies.
+- **Interactions:** opening a task slides the **task detail panel** in over the columns — task-level comments live there, separate from the space Thread. On tablet the Docs column hides first, then the thread collapses to an overlay toggle.
 
 ### D. Goals rollup
 The founder view; the screen that replaces a status meeting. A list of objectives. Each objective card:
@@ -134,7 +131,9 @@ Slides in over any list; doesn't navigate away. Contents: editable title; **stat
 Centered modal. A large **title** input is the only required field. A context chip shows where it lands: **Personal** when opened from My work, or the current space when opened inside one. Status defaults to **Backlog**. Optional chips below: assignee, priority, due date, and (engineering) link branch. Enter creates and closes.
 
 ### G. Document view / editor
-Clean markdown editor: title, body, a light toolbar or slash commands. Supports embedding **PDFs and images** (only these, plus markdown — reject other types in the UI). A **linked tasks** section and inline comments. An optional doc-type label (note / spec / decision log) and a scope indicator (personal vs a space).
+A modal that opens over the current screen. **View mode** renders the markdown body properly (headings, lists, code blocks, tables, links — GFM), styled with the token system (flat, hairline, mono for code). An **Edit** toggle swaps the body for a plain-markdown textarea (and an editable title); **Save** persists and returns to the rendered view. Supports embedding **PDFs and images** (only these, plus markdown — reject other types in the UI). A **linked tasks** section and inline comments. An optional doc-type label (note / spec / decision log) and a scope indicator (personal vs a space). A newly created doc opens straight into edit mode. Bodies are stored one markdown file per doc (`Documents_Stage/<id>.md`), never rendered HTML.
+
+**External link bookmarks.** A document may instead be a bookmark to an external file (Google Sheets / Docs / Slides, Figma, Notion, …): it stores only a `url`, no bytes. These render in doc lists with a **provider icon** derived from the URL (Sheets = green grid, Docs = blue doc, Slides = amber, Figma, Notion, else a generic link glyph) and a hover ↗; clicking opens the URL in a new tab rather than the editor. Created via **+ New link** (paste URL + optional title; title defaults to the domain).
 
 ### H. Command palette (⌘K)
 Overlay with a single input and grouped results: **Navigate** (spaces, docs, tasks), **Create** (task, doc, space), **Actions** (change status, assign). Fully operable by keyboard.
@@ -160,7 +159,8 @@ Build these as reusable pieces with hover / focus / selected / disabled states:
 - **Git badge** (branch / PR open / merged).
 - **Task row** — states: default, hover, keyboard-selected, done (muted + strikethrough).
 - **Inbox item** · **Goal card** with **KR progress bar**.
-- **Doc list row** — title, type icon, owning space or private badge, owner avatar, edited timestamp.
+- **Doc list row** — title, type icon, owning space or private badge, owner avatar, edited timestamp. **External-link variant:** a provider icon (Sheets / Docs / Slides / Figma / Notion / generic) + title + hover ↗; opens the URL in a new tab.
+- **Document viewer/editor modal** — renders GFM markdown in view mode; Edit toggle → markdown textarea + Save.
 - **Meeting row** and **meeting detail** (attendee chips, outcomes notes, action-item checklist where an item converts to a task).
 - **Thread post** — two variants: a plain **message**, and a **status post** with a **health pill**. Author, mono timestamp, markdown body, optional short replies.
 - **Thread feed + composer** — shared by a space thread and the company General thread.
@@ -198,12 +198,12 @@ Populate the demo with this so it reads as a real, lived-in workspace.
 - Devon (6h): "Heads up — rotating the signing keys Thursday, expect a brief blip."
 - Mara (5h): "Noted, I'll hold the SSO merge until after."
 
-**Company General thread (right rail of the Spaces tab):**
+**Company General thread (General thread column of the Spaces hub):**
 - Aaryan (2d): "Board meeting Friday — I'll share the deck Thursday for feedback."
 - Priya (1d): "New laptops arrive next week; reply with your size preference."
 - Sam (4h): "Closed the Northwind deal — biggest logo yet."
 
-**Docs (Docs tab):** "Payments spec" (spec · Payments), "Refund-flow RFC" (note · Payments), "Auth outage postmortem" (decision log · Infra), "Q3 board deck" (note · private).
+**Docs (Docs column):** "Payments spec" (spec · Payments), "Refund-flow RFC" (note · Payments), "Auth outage postmortem" (decision log · Infra), "Q3 board deck" (note · private). Plus a few **external-link** examples to exercise provider icons: "Payments budget FY25" (Google Sheets · Payments), "Login flow" (Figma · Auth), "Incident runbook" (Notion · Infra).
 
 **Meetings (Meetings tab):**
 - "Weekly eng sync" — Mon 10:00 — Mara, Devon, Aaryan — outcome: "Prioritized SSO; deferred the token-storage audit." Action item: "Hold SSO merge until key rotation" (→ Auth).
@@ -226,7 +226,7 @@ Populate the demo with this so it reads as a real, lived-in workspace.
 **P0 — build first (these tell the whole story):**
 My work · Goals rollup · one engineering Space detail (tasks in the main column, right rail with docs + thread) · quick-create modal · task detail panel.
 
-**P1:** Spaces hub — the Spaces tab (with the company General thread) and the Docs tab · the standalone Meetings area (list + detail panel) · workstream Space variant · command palette.
+**P1:** Spaces hub — the three-column layout (Spaces list · Docs rail · company General thread) · the standalone Meetings area (list + detail panel) · workstream Space variant · command palette.
 
 **P2:** Document editor · richer meetings (calendar / transcript integrations) · dark mode polish · settings.
 

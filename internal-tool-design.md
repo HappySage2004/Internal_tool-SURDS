@@ -83,7 +83,7 @@ erDiagram
 ### Component inventory
 
 - **Personal screen ("My work")** — a *filtered view*, not a separate store. It reads tasks assigned to the current user across all Spaces, the user's own private tasks (which live nowhere else), the user's own and recently-edited documents, and the personal inbox.
-- **Spaces hub** — an org-level screen with two tabs: **Spaces** (the grouped list of all Spaces) and **Docs** (all documents). The Spaces tab carries the **General thread** in a right rail.
+- **Spaces hub** — an org-level screen laid out in three regions (no tabs): a **main column** listing every Space grouped by mode (info-rich rows — latest status excerpt, related goals, doc count), a **Docs rail** (all documents, grouped by Space + Personal), and the **General thread rail**. This mirrors the individual Space layout (main + Docs rail + Thread rail) so every space-like screen shares one mental model.
 - **Meetings** — its own top-level area, separate from the Spaces hub.
 - **Space** — the container object. `engineering` mode defaults to engineering task statuses, optional cycles, and git linking. `workstream` mode defaults to a recurring update cadence with no git concepts. The underlying record is identical; mode only changes defaults and which affordances appear.
 - **Goals layer** — company-level objectives with optional key results. Spaces attach to goals; goal health is *derived* from the latest status post in each attached Space's thread, not maintained by hand.
@@ -158,7 +158,7 @@ The only fields a human must supply are the ones a record is meaningless without
 | Storage (interim) | **Local JSON files** in a `local_DB/` folder — one file per collection |
 | Storage (target) | **MongoDB** (preferred) — see rationale below |
 | Storage (fallback) | **PostgreSQL** if a relational cluster is assigned instead |
-| Files | markdown / PDF / image only; stored as references (object storage or a local `uploads/` dir) |
+| Files | markdown / PDF / image only; stored as references (object storage or a local `uploads/` dir). Document **bodies** are markdown, stored one file per doc as `Documents_Stage/<id>.md` at repo root (the collection holds metadata only). |
 
 ### Why a document store (and why the model below is document-shaped)
 
@@ -253,7 +253,6 @@ Each collection below is, in the interim, a JSON file under `local_DB/` containi
   "doc_type": "note|spec|decision_log|null",
   "url": "string|null",                     // external link (Google Sheets/Docs, Figma, Notion, …); when set, the doc is a bookmark — only the URL is stored, no bytes. Does NOT relax the attachment kinds in §3/§6.
   "content": "markdown",                    // default ""; body is stored on disk as Documents_Stage/<id>.md (one file per doc, at repo root) and injected into responses — link docs (url set) have no file
-
   "linked_task_ids": ["task_id"],           // bidirectional spec <-> issues
   "comments": [ /* same shape as task comments */ ],
   "attachments": [ { "kind": "markdown|pdf|image", "storage_key": "string", "filename": "string|null" } ],
@@ -342,9 +341,9 @@ Because the store (JSON files / MongoDB) enforces nothing, the **backend** is re
 - The unified **Space** object in two modes.
 - **Tasks** (shared primitive) with the minimal status set and mostly-optional fields.
 - **Personal (private) tasks** in "My work", optionally tagged to a Space without exposing them.
-- **Documents** (markdown + PDF/image embeds and attachments); personal or space-scoped; reachable from the Docs tab of the Spaces hub.
+- **Documents** (markdown bodies rendered client-side + PDF/image embeds and attachments); personal or space-scoped; reachable from the Docs rail of the Spaces hub and each Space. A document may instead be an **external link bookmark** (optional `url` to Google Sheets/Docs/Slides, Figma, Notion, …) — only the link is stored, no bytes, and this does not relax the attachment kinds in §3.
 - **My work** screen: inbox + my tasks (shared + personal) + my docs.
-- **Spaces hub**: Spaces tab (grouped list + General thread rail) and Docs tab.
+- **Spaces hub**: a three-region screen (no tabs) — grouped Spaces list + a Docs rail + the General thread rail.
 - **Threads**: one conversation per Space (messages + health-tagged status posts) and one company **General thread**.
 - **Goals rollup**: objectives + key results + the latest status post per attached Space.
 - **Meetings**: standalone area — list + detail (date, attendees, outcomes, action-items-to-tasks).

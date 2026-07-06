@@ -31,7 +31,8 @@ A fast, minimal internal tool for a startup under 10 people. It unifies tasks, d
 - **Backend:** FastAPI (Python 3.11+), Pydantic v2 for request/response models and validation.
 - **Storage now:** local JSON files in `local_DB/` — one file per collection, each an array of documents matching design §5.
 - **Storage target:** MongoDB (preferred). **Fallback:** PostgreSQL. The migration is a config flip plus one repository implementation (see §9).
-- **Files:** markdown / PDF / image only. Store bytes under `uploads/` (or object storage later); persist only references.
+- **Files:** markdown / PDF / image only. Store attachment bytes under `uploads/` (or object storage later); persist only references. **Document bodies** are markdown, written one file per doc as `Documents_Stage/<id>.md` at repo root — the collection record holds metadata only and the body is injected on read (link bookmarks carry a `url` and have no file). Config: `DOCUMENTS_STAGE_PATH`.
+- **Markdown rendering:** the frontend renders doc bodies with `react-markdown` + `remark-gfm` (GFM). Store raw markdown, never rendered HTML.
 
 ## 4. Repository layout
 
@@ -49,7 +50,8 @@ A fast, minimal internal tool for a startup under 10 people. It unifies tasks, d
 │   ├── thread_posts.json
 │   ├── meetings.json
 │   └── inbox_items.json
-├── uploads/                   # md/pdf/image bytes (git-ignored)
+├── uploads/                   # md/pdf/image attachment bytes (git-ignored)
+├── Documents_Stage/           # document markdown bodies, one <id>.md per doc (git-ignored)
 ├── backend/
 │   ├── app/
 │   │   ├── main.py            # FastAPI app, CORS, router registration
@@ -69,9 +71,9 @@ A fast, minimal internal tool for a startup under 10 people. It unifies tasks, d
     │   ├── main.tsx
     │   ├── api/               # thin typed client to the backend
     │   ├── types/             # shared data types (mirror design §5)
-    │   ├── components/        # reusable UI pieces (UI.md §7)
+    │   ├── components/        # reusable UI pieces (UI.md §7); incl. panels/DocumentViewer (markdown render/edit)
     │   ├── screens/           # one per UI.md §6 screen
-    │   ├── lib/               # keyboard shortcuts, formatting, hooks
+    │   ├── lib/               # keyboard shortcuts, formatting, hooks; incl. linkProvider (URL → provider icon)
     │   └── styles/            # tokens from UI.md §4
     ├── index.html
     └── package.json
@@ -92,6 +94,7 @@ A fast, minimal internal tool for a startup under 10 people. It unifies tasks, d
   `JsonRepository` implements it over `local_DB/*.json`; `MongoRepository` implements the same interface later. Keep the interface **async** even though the JSON version is effectively synchronous, so `motor` (async Mongo) drops in unchanged. Inject the active repository via `deps.py`, chosen by `config.STORAGE_BACKEND`.
 - **`local_DB` JSON handling:** each file is a JSON array. Load-all / filter-in-memory / save-all is fine at this scale (<10 users). **Write atomically**: serialize to a temp file in the same dir, then `os.replace()` — never partial-write a JSON file. Use a process-level lock around writes to avoid concurrent corruption.
 - **Pydantic models mirror design §5** field-for-field, including which fields are optional. Use them for both validation and serialization. Keep the enum definitions in one module and reuse them.
+- **Document bodies on disk:** the `documents` collection stores metadata only; the markdown body is written to `Documents_Stage/<id>.md` (with a small stripped-on-read front-matter header) and re-attached to `content` on read, falling back to any inline `content` for seed data. Link bookmarks (`url` set) get no file. Isolate this in one small module (e.g. `doc_files.py`) so the Mongo backend can swap it for GridFS/object storage without touching routers.
 - **Invariants (design §6) live in services**, applied on every relevant write and read. In particular, every list/get of tasks and documents must filter by the current user so private items never leak. Put this in one helper that all read paths call.
 - **Current user:** provide it via a dependency (`deps.get_current_user`). For the demo, accept an `X-User-Id` header or fall back to a seeded dev user. Do **not** build real auth — but route every request through this dependency so a real auth layer can replace it later without touching services.
 - **API shape:** REST, plural nouns (`/tasks`, `/spaces/{id}/tasks`, `/threads/general/posts`, `/meetings`). JSON bodies. Correct status codes (201 on create, 404 missing, 422 validation, 409 invariant violation). Consistent error body:
@@ -104,7 +107,8 @@ A fast, minimal internal tool for a startup under 10 people. It unifies tasks, d
 ## 6. Frontend conventions
 
 - **React function components + hooks.** TypeScript recommended; put shared shapes in `src/types/` mirroring design §5 so the client and server agree.
-- **Follow `UI.md` exactly** for layout, the two-pane screens, navigation (sidebar + Spaces hub tabs + standalone Meetings), and the visual language: Inter for UI text, **JetBrains Mono** for task keys / KR numbers / timestamps, a single indigo accent, flat hairline borders, sentence case everywhere, no gradients or shadows (focus ring only). Don't invent styling — `UI.md` §4 is the token system.
+- **Follow `UI.md` exactly** for layout, the multi-column screens (main + Docs column + Thread column; the Spaces hub is the same shape at org level, no tabs), navigation (sidebar + Spaces hub + standalone Meetings), and the visual language: Inter for UI text, **JetBrains Mono** for task keys / KR numbers / timestamps, a single indigo accent, flat hairline borders, sentence case everywhere, no gradients or shadows (focus ring only). Don't invent styling — `UI.md` §4 is the token system.
+- **Markdown docs:** render bodies with `react-markdown` + `remark-gfm` inside the document viewer (`.markdown-body` styles in `index.css`, built from the §4 tokens). External-link docs (Document with a `url`) render a provider icon via `lib/linkProvider` and open in a new tab instead of the viewer.
 - **Data layer:** a thin typed client in `src/api/`. Use optimistic updates for status changes, task creation, and posting to threads (revert on error) to hit the speed bar. A lightweight cache (e.g. React Query) is fine; avoid heavy global state.
 - **Keyboard-first:** global `⌘K` command palette and `C` quick-create (`UI.md` §6F/§6H). Visible focus on every interactive element; respect `prefers-reduced-motion`; responsive down to tablet (right rails collapse to overlays).
 - **Screens map 1:1 to `UI.md` §6** (My work, Spaces hub, Space detail, Goals rollup, Task detail panel, Quick-create, Document editor, Command palette, Meetings). Components map to `UI.md` §7.
@@ -121,6 +125,7 @@ The document shapes in `internal-tool-design.md` §5 are the single contract. Ba
 STORAGE_BACKEND=json          # json | mongo
 LOCAL_DB_PATH=./local_DB
 UPLOADS_PATH=./uploads
+DOCUMENTS_STAGE_PATH=         # document markdown bodies; defaults to <repo root>/Documents_Stage
 MONGO_URI=                     # set when STORAGE_BACKEND=mongo
 FRONTEND_ORIGIN=http://localhost:5173
 ```
@@ -153,7 +158,7 @@ Seed `local_DB/` from the demo data in `UI.md` §9 on first run if the files are
 Follow `UI.md` §10 priorities:
 
 - **P0:** My work · Goals rollup · one engineering Space detail (tasks + right rail with docs and thread) · quick-create modal · task detail panel. Backend: users, spaces, tasks (incl. personal + privacy), goals + rollup, thread_posts, inbox.
-- **P1:** Spaces hub (Spaces tab with General thread + Docs tab) · standalone Meetings area · workstream Space variant · command palette.
+- **P1:** Spaces hub (three columns: Spaces list + Docs rail + General thread) · standalone Meetings area · workstream Space variant · command palette.
 - **P2:** Document editor · richer meetings (integrations) · dark mode polish · settings.
 
 Build P0 end-to-end (backend + frontend) before starting P1.
