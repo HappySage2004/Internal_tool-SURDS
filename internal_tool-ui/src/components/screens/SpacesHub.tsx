@@ -1,5 +1,5 @@
 import { useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Plus, FileText, BookOpen, Clipboard, Lock, ExternalLink } from 'lucide-react'
+import { Plus, FileText, BookOpen, Clipboard, Lock, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import * as apiClient from '../../api'
 import { getLinkProvider } from '../../lib/linkProvider'
@@ -10,6 +10,7 @@ import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { ThreadFeed } from '../ui/ThreadFeed'
 import { DocumentViewer } from '../panels/DocumentViewer'
+import { NewDocModal } from '../modals/NewDocModal'
 
 interface SpacesHubProps {
   onSelectSpace: (spaceId: string) => void
@@ -93,6 +94,7 @@ export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
   const [railWidth, setRailWidth] = useState(340)
   const [viewerDoc, setViewerDoc] = useState<Document | null>(null)
   const [viewerEditing, setViewerEditing] = useState(false)
+  const [showNewDoc, setShowNewDoc] = useState(false)
 
   function handleRailResizeMouseDown(e: ReactMouseEvent<HTMLDivElement>) {
     e.preventDefault()
@@ -121,16 +123,6 @@ export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
     try {
       const raw = await apiClient.createPost({ space_id: null, kind: 'message', body })
       addPost(apiClient.mapPost(raw))
-    } catch (e) { console.error(e) }
-  }
-
-  const handleNewDoc = async () => {
-    try {
-      const raw = await apiClient.createDocument({ title: 'Untitled', doc_type: 'note', content: '' })
-      const doc = apiClient.mapDocument(raw)
-      addDocument(doc)
-      setViewerEditing(true)
-      setViewerDoc(doc)
     } catch (e) { console.error(e) }
   }
 
@@ -210,7 +202,7 @@ export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
           <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Docs</span>
           <button
-            onClick={handleNewDoc}
+            onClick={() => setShowNewDoc(true)}
             className="flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline transition-colors duration-150"
           >
             <Plus size={13} />
@@ -250,7 +242,9 @@ export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
                           </a>
                         )
                       }
-                      const Icon = docTypeIcon(doc.docType)
+                      const Icon = doc.fileKind === 'image' ? ImageIcon
+                        : doc.fileKind === 'pdf' ? FileText
+                        : docTypeIcon(doc.docType)
                       return (
                         <button
                           key={doc.id}
@@ -292,6 +286,20 @@ export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
           />
         </div>
       </div>
+
+      {/* New doc modal (with space picker) */}
+      {showNewDoc && (
+        <NewDocModal
+          spaces={spaces}
+          onClose={() => setShowNewDoc(false)}
+          onCreated={(doc, openInEdit) => {
+            addDocument(doc)
+            setViewerEditing(openInEdit)
+            setViewerDoc(doc)
+            setShowNewDoc(false)
+          }}
+        />
+      )}
 
       {/* Document viewer / editor */}
       {viewerDoc && (

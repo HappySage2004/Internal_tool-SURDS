@@ -1,6 +1,10 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
+from app.config import settings
 from app.routers import health, users, goals, spaces, tasks, documents, thread_posts, inbox, meetings
 
 app = FastAPI(
@@ -26,5 +30,10 @@ app.include_router(documents.router,    prefix="/documents",    tags=["documents
 app.include_router(thread_posts.router, prefix="/thread-posts", tags=["threads"])
 app.include_router(inbox.router,        prefix="/inbox",         tags=["inbox"])
 app.include_router(meetings.router,     prefix="/meetings",      tags=["meetings"])
+
+# Serve uploaded PDF/image bytes read-only.
+_uploads_dir = Path(settings.uploads_path)
+_uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")
 
 app.description = "Internal tool API — all phases complete."

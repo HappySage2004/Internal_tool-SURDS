@@ -1,14 +1,31 @@
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from app.config import settings
 from app.dependencies import get_current_user, get_store
 from app.doc_files import delete_document_file, read_document_content, write_document_file
 from app.repositories.store import Store
 from app.schemas.schemas import CommentIn, CommentOut, DocumentCreate, DocumentOut, DocumentUpdate
 
 router = APIRouter()
+
+# Allowed upload kinds (§6 invariant #9: markdown/pdf/image only; uploads are pdf/image).
+_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
+
+
+def _upload_kind(content_type: str | None, filename: str | None) -> str | None:
+    ct = (content_type or "").lower()
+    ext = os.path.splitext(filename or "")[1].lower()
+    if ct == "application/pdf" or ext == ".pdf":
+        return "pdf"
+    if ct in _IMAGE_TYPES or ext in _IMAGE_EXTS:
+        return "image"
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +108,46 @@ async def create_document(
     # Bookmarks (url set) have no body → no staged file.
     if not stored.get("url"):
         write_document_file(stored, content)
+    return _with_content(stored)
+
+
+@router.post("/upload", response_model=DocumentOut, status_code=201)
+async def upload_document(
+    file: UploadFile = File(...),
+    title: str | None = Form(None),
+    space_id: str | None = Form(None),
+    store: Store = Depends(get_store),
+    current_user: dict = Depends(get_current_user),
+):
+    """Create a document from an uploaded PDF or image (bytes stored under /uploads)."""
+    kind = _upload_kind(file.content_type, file.filename)
+    if kind is None:
+        raise HTTPException(status_code=415, detail="Only PDF and image files are allowed")
+
+    doc_id = str(uuid4())
+    ext = os.path.splitext(file.filename or "")[1].lower() or (".pdf" if kind == "pdf" else "")
+    storage_key = f"{doc_id}{ext}"
+
+    uploads = Path(settings.uploads_path)
+    uploads.mkdir(parents=True, exist_ok=True)
+    (uploads / storage_key).write_bytes(await file.read())
+
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": doc_id,
+        "title": title or file.filename or "Untitled",
+        "space_id": space_id,
+        "doc_type": None,
+        "url": None,
+        "owner_id": current_user["id"],
+        "linked_task_ids": [],
+        "comments": [],
+        "attachments": [{"kind": kind, "storage_key": storage_key, "filename": file.filename}],
+        "created_at": now,
+        "updated_at": now,
+        "archived_at": None,
+    }
+    stored = await store.documents.insert(doc)
     return _with_content(stored)
 
 

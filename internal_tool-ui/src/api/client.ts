@@ -1,5 +1,8 @@
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'
 
+// Base for static assets served by the backend (e.g. /uploads/<file>).
+export const ASSET_BASE = BASE
+
 // Recursively convert snake_case object keys to camelCase
 function toCamel(val: unknown): unknown {
   if (Array.isArray(val)) return val.map(toCamel)
@@ -29,5 +32,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const get  = <T>(path: string)                  => request<T>(path)
 export const post = <T>(path: string, body?: unknown)  => request<T>(path, { method: 'POST',  body: body ? JSON.stringify(body) : undefined })
+
+// Multipart POST — no JSON Content-Type (the browser sets the boundary).
+export async function postForm<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { method: 'POST', body: form })
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText)
+    throw new Error(`POST ${path} → ${res.status}: ${detail}`)
+  }
+  return toCamel(await res.json()) as T
+}
 export const patch = <T>(path: string, body: unknown)  => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) })
 export const del  = (path: string)                     => request<void>(path, { method: 'DELETE' })

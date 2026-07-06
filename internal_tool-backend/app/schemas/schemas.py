@@ -265,6 +265,12 @@ class DocumentUpdate(BaseModel):
     url: Optional[str] = None
 
 
+class AttachmentOut(BaseModel):
+    kind: str                            # "markdown" | "pdf" | "image"
+    storage_key: str                     # filename under /uploads
+    filename: Optional[str] = None
+
+
 class DocumentOut(BaseModel):
     id: str
     title: str
@@ -273,6 +279,7 @@ class DocumentOut(BaseModel):
     doc_type: Optional[str] = None
     content: str
     url: Optional[str] = None
+    attachments: list[AttachmentOut] = []
     linked_task_ids: list[str] = []
     comments: list[CommentOut] = []
     created_at: str

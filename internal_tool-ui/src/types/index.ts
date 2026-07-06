@@ -94,6 +94,10 @@ export interface Document {
   /** External link (Google Sheets/Docs, Figma, Notion, …). When set, this
    *  Document is a bookmark — only the URL is stored, no bytes. */
   url?: string
+  /** Set when the doc is an uploaded file rather than a markdown body. */
+  fileKind?: 'pdf' | 'image'
+  /** Served URL for the uploaded file (backend /uploads/<key>). */
+  fileUrl?: string
 }
 
 export interface ActionItem {

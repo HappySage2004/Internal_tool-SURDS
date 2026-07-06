@@ -1,5 +1,5 @@
 import { useState, useEffect, type MouseEvent as ReactMouseEvent } from 'react'
-import { GitBranch, GitPullRequest, GitMerge, Plus, Code2, FileText, X, ExternalLink } from 'lucide-react'
+import { GitBranch, GitPullRequest, GitMerge, Plus, Code2, FileText, X, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import * as apiClient from '../../api'
 import { getLinkProvider } from '../../lib/linkProvider'
@@ -11,6 +11,7 @@ import { Button } from '../ui/Button'
 import { TaskRow } from '../ui/TaskRow'
 import { ThreadFeed } from '../ui/ThreadFeed'
 import { DocumentViewer } from '../panels/DocumentViewer'
+import { NewDocModal } from '../modals/NewDocModal'
 
 interface SpaceDetailProps {
   spaceId: string
@@ -65,7 +66,6 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
   const [linkUrl, setLinkUrl] = useState('')
   const [linkTitle, setLinkTitle] = useState('')
   const [showDocModal, setShowDocModal] = useState(false)
-  const [docTitle, setDocTitle] = useState('')
   const [viewerDoc, setViewerDoc] = useState<Document | null>(null)
   const [viewerEditing, setViewerEditing] = useState(false)
 
@@ -132,23 +132,6 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
     try {
       const raw = await apiClient.createTask({ title, space_id: spaceId, status: 'todo' })
       setSpaceTasks(prev => [apiClient.mapTask(raw), ...prev])
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
-  const handleAddDoc = async () => {
-    // Title is optional — defaults to "Untitled" per design §3.
-    const title = docTitle.trim() || 'Untitled'
-    setDocTitle('')
-    setShowDocModal(false)
-    try {
-      const raw = await apiClient.createDocument({ title, space_id: spaceId, doc_type: 'note', content: '' })
-      const doc = apiClient.mapDocument(raw)
-      addDocument(doc)
-      // Open the new doc straight into edit mode so the user can write.
-      setViewerEditing(true)
-      setViewerDoc(doc)
     } catch (e) {
       console.error(e)
     }
@@ -319,13 +302,14 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
                     </a>
                   )
                 }
+                const FileIcon = doc.fileKind === 'image' ? ImageIcon : FileText
                 return (
                   <button
                     key={doc.id}
                     onClick={() => { setViewerEditing(false); setViewerDoc(doc) }}
                     className="w-full flex items-center gap-2 py-1.5 cursor-pointer hover:text-[var(--text)] transition-colors duration-150 text-left"
                   >
-                    <FileText size={13} className="text-[var(--text-muted)] flex-shrink-0" />
+                    <FileIcon size={13} className="text-[var(--text-muted)] flex-shrink-0" />
                     <span className="flex-1 text-[13px] text-[var(--text)] truncate">{doc.title}</span>
                     <span className="mono text-[11px] text-[var(--text-faint)]">{doc.updatedAt}</span>
                   </button>
@@ -433,44 +417,18 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
         </>
       )}
 
-      {/* New doc modal */}
+      {/* New doc modal (locked to this space) */}
       {showDocModal && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/20 z-40"
-            onClick={() => setShowDocModal(false)}
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] w-full max-w-md shadow-xl">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-                <h3 className="text-[15px] font-medium text-[var(--text)]">New doc — {space.name}</h3>
-                <button
-                  onClick={() => setShowDocModal(false)}
-                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[rgba(18,18,28,0.06)] transition-all duration-150"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="p-5 space-y-4">
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider mb-2">Title <span className="normal-case text-[var(--text-faint)]">(optional)</span></p>
-                  <input
-                    autoFocus
-                    value={docTitle}
-                    onChange={e => setDocTitle(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleAddDoc() }}
-                    placeholder="Untitled"
-                    className="w-full text-[13px] text-[var(--text)] bg-transparent border border-[var(--border)] rounded-[6px] px-3 py-2 placeholder:text-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#5B57E0] transition-all duration-150"
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setShowDocModal(false)}>Cancel</Button>
-                  <Button variant="primary" size="sm" onClick={handleAddDoc}>Create doc</Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
+        <NewDocModal
+          fixedSpaceId={spaceId}
+          onClose={() => setShowDocModal(false)}
+          onCreated={(doc, openInEdit) => {
+            addDocument(doc)
+            setViewerEditing(openInEdit)
+            setViewerDoc(doc)
+            setShowDocModal(false)
+          }}
+        />
       )}
 
       {/* Add link modal */}

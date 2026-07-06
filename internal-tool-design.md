@@ -255,6 +255,7 @@ Each collection below is, in the interim, a JSON file under `local_DB/` containi
   "content": "markdown",                    // default ""; body is stored on disk as Documents_Stage/<id>.md (one file per doc, at repo root) and injected into responses — link docs (url set) have no file
   "linked_task_ids": ["task_id"],           // bidirectional spec <-> issues
   "comments": [ /* same shape as task comments */ ],
+  // A doc created by UPLOADING a pdf/image carries one attachment; its bytes live under uploads/<storage_key> (served read-only at /uploads/<storage_key>) and content is "".
   "attachments": [ { "kind": "markdown|pdf|image", "storage_key": "string", "filename": "string|null" } ],
   "created_at": "ISO-8601",
   "updated_at": "ISO-8601",

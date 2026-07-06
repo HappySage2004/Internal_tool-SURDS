@@ -1,4 +1,4 @@
-import { get, post, patch } from './client'
+import { get, post, patch, postForm, ASSET_BASE } from './client'
 import type { User, Goal, Space, Task, Document, InboxItem, Meeting, ThreadPost, GitLink, Health } from '../types'
 
 // ─── Raw API shapes (post-camelCase transform, pre-mapping) ──────────────────
@@ -10,7 +10,8 @@ interface RawSpace  { id: string; name: string; mode: string; ownerId?: string; 
 interface RawGitLink { refType: string; url: string; externalId?: string; state?: string }
 interface RawComment { id: string; authorId: string; body: string; parentCommentId?: string; createdAt: string; editedAt?: string | null }
 interface RawTask   { id: string; key?: string; spaceId?: string; title: string; status: string; description?: string; assigneeId?: string; priority?: string; dueDate?: string; tagSpaceId?: string; gitLinks: RawGitLink[]; comments: RawComment[]; createdBy?: string; createdAt: string; updatedAt: string; completedAt?: string }
-interface RawDoc    { id: string; title: string; ownerId: string; spaceId?: string; docType?: string; content: string; url?: string; linkedTaskIds: string[]; createdAt: string; updatedAt: string; archivedAt?: string }
+interface RawAttachment { kind: string; storageKey: string; filename?: string }
+interface RawDoc    { id: string; title: string; ownerId: string; spaceId?: string; docType?: string; content: string; url?: string; attachments?: RawAttachment[]; linkedTaskIds: string[]; createdAt: string; updatedAt: string; archivedAt?: string }
 interface RawPost   { id: string; spaceId: string | null; authorId: string; kind: string; body: string; health?: string; parentPostId?: string; periodLabel?: string; createdAt: string }
 interface RawInbox  { id: string; userId: string; type: string; taskId?: string; documentId?: string; postId?: string; readAt?: string; createdAt: string }
 interface RawMeetingAI { id: string; text: string; done: boolean; taskId?: string }
@@ -106,6 +107,7 @@ export function mapTask(t: RawTask): Task {
 }
 
 export function mapDocument(d: RawDoc): Document {
+  const att = (d.attachments ?? []).find(a => a.kind === 'pdf' || a.kind === 'image')
   return {
     id: d.id, title: d.title, ownerId: d.ownerId,
     spaceId: d.spaceId ?? undefined,
@@ -113,6 +115,8 @@ export function mapDocument(d: RawDoc): Document {
     updatedAt: formatRelative(d.updatedAt),
     content: d.content,
     url: d.url ?? undefined,
+    fileKind: att ? (att.kind as 'pdf' | 'image') : undefined,
+    fileUrl: att ? `${ASSET_BASE}/uploads/${att.storageKey}` : undefined,
   }
 }
 
@@ -190,6 +194,14 @@ export const createDocument = (body: {
 export const updateDocument = (docId: string, body: {
   title?: string; content?: string; doc_type?: string; space_id?: string; url?: string;
 }) => patch<RawDoc>(`/documents/${docId}`, body)
+
+export const uploadDocument = (file: File, opts: { title?: string; space_id?: string } = {}) => {
+  const form = new FormData()
+  form.append('file', file)
+  if (opts.title) form.append('title', opts.title)
+  if (opts.space_id) form.append('space_id', opts.space_id)
+  return postForm<RawDoc>('/documents/upload', form)
+}
 export const getInbox       = () => get<RawInbox[]>('/inbox')
 export const getMeetings    = () => get<RawMeeting[]>('/meetings')
 

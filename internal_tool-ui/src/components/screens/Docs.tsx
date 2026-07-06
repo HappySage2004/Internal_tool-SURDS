@@ -1,36 +1,25 @@
 import { useState } from 'react'
-import { Plus, FileText, Lock, ExternalLink } from 'lucide-react'
+import { Plus, FileText, Lock, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import { useData } from '../../context/DataContext'
-import * as apiClient from '../../api'
 import { getLinkProvider } from '../../lib/linkProvider'
 import type { Document } from '../../types'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { DocumentViewer } from '../panels/DocumentViewer'
+import { NewDocModal } from '../modals/NewDocModal'
 
 export function Docs() {
-  const { documents, spacesById, addDocument } = useData()
+  const { documents, spaces, spacesById, addDocument } = useData()
   const [viewerDoc, setViewerDoc] = useState<Document | null>(null)
   const [viewerEditing, setViewerEditing] = useState(false)
-
-  const handleNewDoc = async () => {
-    try {
-      const raw = await apiClient.createDocument({ title: 'Untitled', doc_type: 'note', content: '' })
-      const doc = apiClient.mapDocument(raw)
-      addDocument(doc)
-      setViewerEditing(true)
-      setViewerDoc(doc)
-    } catch (e) {
-      console.error(e)
-    }
-  }
+  const [showNewDoc, setShowNewDoc] = useState(false)
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 pt-8 pb-12">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-[21px] font-medium text-[var(--text)]">Docs</h1>
-          <Button variant="primary" size="sm" onClick={handleNewDoc}>
+          <Button variant="primary" size="sm" onClick={() => setShowNewDoc(true)}>
             <Plus size={14} />
             New doc
           </Button>
@@ -40,7 +29,7 @@ export function Docs() {
           {documents.map((doc, idx) => {
             const space = doc.spaceId ? spacesById[doc.spaceId] : undefined
             const provider = doc.url ? getLinkProvider(doc.url) : undefined
-            const Icon = provider?.icon ?? FileText
+            const Icon = provider?.icon ?? (doc.fileKind === 'image' ? ImageIcon : FileText)
             const rowClass = `
               flex items-center gap-3 px-4 py-3 cursor-pointer
               hover:bg-[var(--canvas)] transition-all duration-150
@@ -84,6 +73,19 @@ export function Docs() {
           })}
         </div>
       </div>
+
+      {showNewDoc && (
+        <NewDocModal
+          spaces={spaces}
+          onClose={() => setShowNewDoc(false)}
+          onCreated={(doc, openInEdit) => {
+            addDocument(doc)
+            setViewerEditing(openInEdit)
+            setViewerDoc(doc)
+            setShowNewDoc(false)
+          }}
+        />
+      )}
 
       {viewerDoc && (
         <DocumentViewer
