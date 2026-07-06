@@ -116,7 +116,8 @@ export function mapDocument(d: RawDoc): Document {
     content: d.content,
     url: d.url ?? undefined,
     fileKind: att ? (att.kind as 'pdf' | 'image') : undefined,
-    fileUrl: att ? `${ASSET_BASE}/uploads/${att.storageKey}` : undefined,
+    // Served through the privacy-gated endpoint, not a static mount.
+    fileUrl: att ? `${ASSET_BASE}/documents/${d.id}/file` : undefined,
   }
 }
 

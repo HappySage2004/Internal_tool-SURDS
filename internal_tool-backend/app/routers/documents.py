@@ -1,13 +1,19 @@
+import mimetypes
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
-from app.config import settings
 from app.dependencies import get_current_user, get_store
-from app.doc_files import delete_document_file, read_document_content, write_document_file
+from app.doc_files import (
+    delete_document_file,
+    read_document_content,
+    stage_file_path,
+    write_document_file,
+    write_upload,
+)
 from app.repositories.store import Store
 from app.schemas.schemas import CommentIn, CommentOut, DocumentCreate, DocumentOut, DocumentUpdate
 
@@ -127,10 +133,7 @@ async def upload_document(
     doc_id = str(uuid4())
     ext = os.path.splitext(file.filename or "")[1].lower() or (".pdf" if kind == "pdf" else "")
     storage_key = f"{doc_id}{ext}"
-
-    uploads = Path(settings.uploads_path)
-    uploads.mkdir(parents=True, exist_ok=True)
-    (uploads / storage_key).write_bytes(await file.read())
+    write_upload(storage_key, await file.read())
 
     now = datetime.now(timezone.utc).isoformat()
     doc = {
@@ -149,6 +152,36 @@ async def upload_document(
     }
     stored = await store.documents.insert(doc)
     return _with_content(stored)
+
+
+@router.get("/{doc_id}/file")
+async def get_document_file(
+    doc_id: str,
+    store: Store = Depends(get_store),
+    current_user: dict = Depends(get_current_user),
+):
+    """Serve an uploaded doc's bytes, gated by the same §6 visibility rule as the doc."""
+    doc = await store.documents.get(doc_id)
+    if not doc or doc.get("archived_at") is not None or not _check_visibility(doc, current_user["id"]):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    att = next((a for a in doc.get("attachments", []) if a.get("kind") in ("pdf", "image")), None)
+    if not att:
+        raise HTTPException(status_code=404, detail="Document has no file")
+
+    path = stage_file_path(att["storage_key"])
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File missing")
+
+    media_type = mimetypes.guess_type(att["storage_key"])[0] or "application/octet-stream"
+    # inline (not attachment) so PDFs/images render in an <iframe>/<img>; the client
+    # download button fetches this as a blob and names it itself.
+    return FileResponse(
+        path,
+        media_type=media_type,
+        filename=att.get("filename") or att["storage_key"],
+        content_disposition_type="inline",
+    )
 
 
 @router.get("/{doc_id}", response_model=DocumentOut)

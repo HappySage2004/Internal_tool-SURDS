@@ -27,6 +27,18 @@ def doc_file_path(doc_id: str) -> Path:
     return _stage_dir() / f"{doc_id}.md"
 
 
+def stage_file_path(storage_key: str) -> Path:
+    """Path to any staged file by its storage key (e.g. an uploaded <id>.pdf)."""
+    return _stage_dir() / storage_key
+
+
+def write_upload(storage_key: str, data: bytes) -> None:
+    """Write uploaded (pdf/image) bytes into the staging folder."""
+    directory = _stage_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / storage_key).write_bytes(data)
+
+
 def write_document_file(doc: dict, content: str) -> None:
     """Write (or overwrite) the staged markdown file for a document."""
     directory = _stage_dir()

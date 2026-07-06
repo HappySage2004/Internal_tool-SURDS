@@ -30,7 +30,10 @@
       "Bash(curl -s \"http://localhost:8000/documents?space_id=auth\")",
       "Bash(python -c \"import sys,json; docs=json.load\\(sys.stdin\\); f=[d for d in docs if d.get\\('attachments'\\)]; print\\('docs with attachments:', [\\(d['title'], d['attachments'][0]['kind']\\) for d in f]\\)\")",
       "Bash(python -)",
-      "PowerShell($conns = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($conns\\) { $conns.OwningProcess | Select-Object -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force; \"stopped PID $_\" } catch { \"could not stop $_\" } } } else { \"nothing listening on 8000\" })"
+      "PowerShell($conns = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($conns\\) { $conns.OwningProcess | Select-Object -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force; \"stopped PID $_\" } catch { \"could not stop $_\" } } } else { \"nothing listening on 8000\" })",
+      "Bash(python -c \"import ast; [ast.parse\\(open\\(f,encoding='utf-8'\\).read\\(\\),f\\) for f in ['app/config.py','app/main.py','app/doc_files.py','app/routers/documents.py']]; print\\('py syntax ok'\\)\")",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c.OwningProcess | Select-Object -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force; \"stopped $_\" } catch {} } } else { \"port 8000 free\" })",
+      "Bash(python -c \"import app.main; routes=[r.path for r in app.main.app.routes]; print\\('imports OK'\\); print\\('has /documents/{doc_id}/file:', '/documents/{doc_id}/file' in routes\\); print\\('has /uploads mount:', any\\('/uploads' in str\\(getattr\\(r,'path',''\\)\\) for r in app.main.app.routes\\)\\)\")"
     ]
   }
 }

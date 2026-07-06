@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { X, Pencil } from 'lucide-react'
+import { X, Pencil, Download } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import * as apiClient from '../../api'
 import type { Document } from '../../types'
@@ -45,6 +45,34 @@ export function DocumentViewer({ doc, onClose, initialEditing = false }: Documen
     setEditing(false)
   }
 
+  // Download the doc: fetch the uploaded file's bytes, or build a .md blob from
+  // the markdown body. Using a blob works cross-origin and lets us name the file.
+  const handleDownload = async () => {
+    const safeName = (title || 'document').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'document'
+    try {
+      let blob: Blob
+      let filename: string
+      if (isFile && doc.fileUrl) {
+        const ext = doc.fileUrl.split('.').pop() || 'bin'
+        blob = await (await fetch(doc.fileUrl)).blob()
+        filename = `${safeName}.${ext}`
+      } else {
+        blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+        filename = `${safeName}.md`
+      }
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   return (
     <>
       <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
@@ -71,14 +99,26 @@ export function DocumentViewer({ doc, onClose, initialEditing = false }: Documen
                     {saving ? 'Saving…' : 'Save'}
                   </Button>
                 </>
-              ) : !isFile && (
-                <button
-                  onClick={() => setEditing(true)}
-                  className="flex items-center gap-1 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors duration-150"
-                >
-                  <Pencil size={13} />
-                  Edit
-                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={handleDownload}
+                    disabled={loading}
+                    title="Download"
+                    className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[rgba(18,18,28,0.06)] disabled:opacity-40 transition-all duration-150"
+                  >
+                    <Download size={15} />
+                  </button>
+                  {!isFile && (
+                    <button
+                      onClick={() => setEditing(true)}
+                      className="flex items-center gap-1 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors duration-150"
+                    >
+                      <Pencil size={13} />
+                      Edit
+                    </button>
+                  )}
+                </>
               )}
               <button
                 onClick={onClose}

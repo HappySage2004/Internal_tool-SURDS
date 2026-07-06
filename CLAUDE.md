@@ -31,7 +31,7 @@ A fast, minimal internal tool for a startup under 10 people. It unifies tasks, d
 - **Backend:** FastAPI (Python 3.11+), Pydantic v2 for request/response models and validation.
 - **Storage now:** local JSON files in `local_DB/` — one file per collection, each an array of documents matching design §5.
 - **Storage target:** MongoDB (preferred). **Fallback:** PostgreSQL. The migration is a config flip plus one repository implementation (see §9).
-- **Files:** markdown / PDF / image only. Store attachment bytes under `uploads/` (or object storage later); persist only references. **Document bodies** are markdown, written one file per doc as `Documents_Stage/<id>.md` at repo root — the collection record holds metadata only and the body is injected on read (link bookmarks carry a `url` and have no file). Config: `DOCUMENTS_STAGE_PATH`.
+- **Files:** markdown / PDF / image only. **All document bytes live in one staging folder** — `Documents_Stage/<id>.md` for markdown bodies, `Documents_Stage/<id>.<ext>` for uploaded pdf/image — at repo root. The collection record holds metadata only; the markdown body is injected on read, and uploaded bytes are served through a **privacy-gated** endpoint (`GET /documents/{id}/file`), never a static mount, so §6 personal-doc privacy holds for files too. Link bookmarks carry a `url` and have no file. Config: `DOCUMENTS_STAGE_PATH`. (This single folder is the local stand-in for object storage / GridFS on migration.)
 - **Markdown rendering:** the frontend renders doc bodies with `react-markdown` + `remark-gfm` (GFM). Store raw markdown, never rendered HTML.
 
 ## 4. Repository layout
@@ -50,8 +50,7 @@ A fast, minimal internal tool for a startup under 10 people. It unifies tasks, d
 │   ├── thread_posts.json
 │   ├── meetings.json
 │   └── inbox_items.json
-├── uploads/                   # md/pdf/image attachment bytes (git-ignored)
-├── Documents_Stage/           # document markdown bodies, one <id>.md per doc (git-ignored)
+├── Documents_Stage/           # ALL document bytes: <id>.md bodies + uploaded <id>.<ext> files (git-ignored)
 ├── backend/
 │   ├── app/
 │   │   ├── main.py            # FastAPI app, CORS, router registration
@@ -95,7 +94,7 @@ A fast, minimal internal tool for a startup under 10 people. It unifies tasks, d
 - **`local_DB` JSON handling:** each file is a JSON array. Load-all / filter-in-memory / save-all is fine at this scale (<10 users). **Write atomically**: serialize to a temp file in the same dir, then `os.replace()` — never partial-write a JSON file. Use a process-level lock around writes to avoid concurrent corruption.
 - **Pydantic models mirror design §5** field-for-field, including which fields are optional. Use them for both validation and serialization. Keep the enum definitions in one module and reuse them.
 - **Document bodies on disk:** the `documents` collection stores metadata only; the markdown body is written to `Documents_Stage/<id>.md` (with a small stripped-on-read front-matter header) and re-attached to `content` on read, falling back to any inline `content` for seed data. Link bookmarks (`url` set) get no file. Isolate this in one small module (e.g. `doc_files.py`) so the Mongo backend can swap it for GridFS/object storage without touching routers.
-- **Uploaded docs (pdf/image):** `POST /documents/upload` (multipart) validates the kind (pdf/image only — reject others 415, per §6 #9), writes bytes to `uploads/<id>.<ext>`, and creates a document with one `attachments` entry (empty `content`). Bytes are served read-only via a `StaticFiles` mount at `/uploads`; the frontend builds the file URL as `<API base>/uploads/<storage_key>`.
+- **Uploaded docs (pdf/image):** `POST /documents/upload` (multipart) validates the kind (pdf/image only — reject others 415, per §6 #9), writes bytes into the staging folder (`Documents_Stage/<id>.<ext>`), and creates a document with one `attachments` entry (empty `content`). Bytes are served by `GET /documents/{id}/file`, which runs the **same §6 visibility check** as the doc (so a personal doc's file isn't public) and returns them `inline`; the frontend uses `<API base>/documents/{id}/file` as the file URL. **Do not** statically mount the staging folder — that would bypass the privacy filter.
 - **Invariants (design §6) live in services**, applied on every relevant write and read. In particular, every list/get of tasks and documents must filter by the current user so private items never leak. Put this in one helper that all read paths call.
 - **Current user:** provide it via a dependency (`deps.get_current_user`). For the demo, accept an `X-User-Id` header or fall back to a seeded dev user. Do **not** build real auth — but route every request through this dependency so a real auth layer can replace it later without touching services.
 - **API shape:** REST, plural nouns (`/tasks`, `/spaces/{id}/tasks`, `/threads/general/posts`, `/meetings`). JSON bodies. Correct status codes (201 on create, 404 missing, 422 validation, 409 invariant violation). Consistent error body:
@@ -125,8 +124,7 @@ The document shapes in `internal-tool-design.md` §5 are the single contract. Ba
 ```
 STORAGE_BACKEND=json          # json | mongo
 LOCAL_DB_PATH=./local_DB
-UPLOADS_PATH=./uploads
-DOCUMENTS_STAGE_PATH=         # document markdown bodies; defaults to <repo root>/Documents_Stage
+DOCUMENTS_STAGE_PATH=         # all document bytes (md bodies + uploaded files); defaults to <repo root>/Documents_Stage
 MONGO_URI=                     # set when STORAGE_BACKEND=mongo
 FRONTEND_ORIGIN=http://localhost:5173
 ```

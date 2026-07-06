@@ -99,7 +99,7 @@ erDiagram
 
 ### Posture
 
-At under 10 users this is not a scale problem; it is an adoption and latency problem. Prioritize sub-100ms interactions (optimistic updates, keyboard-first capture) over throughput. A single store is sufficient. Files (markdown/PDF/image) live in object storage or a local uploads folder; documents store only references.
+At under 10 users this is not a scale problem; it is an adoption and latency problem. Prioritize sub-100ms interactions (optimistic updates, keyboard-first capture) over throughput. A single store is sufficient. Files (markdown/PDF/image) live in object storage or a single local staging folder (`Documents_Stage/`); documents store only references and their bytes are served through a privacy-gated endpoint.
 
 ---
 
@@ -158,7 +158,7 @@ The only fields a human must supply are the ones a record is meaningless without
 | Storage (interim) | **Local JSON files** in a `local_DB/` folder — one file per collection |
 | Storage (target) | **MongoDB** (preferred) — see rationale below |
 | Storage (fallback) | **PostgreSQL** if a relational cluster is assigned instead |
-| Files | markdown / PDF / image only; stored as references (object storage or a local `uploads/` dir). Document **bodies** are markdown, stored one file per doc as `Documents_Stage/<id>.md` at repo root (the collection holds metadata only). |
+| Files | markdown / PDF / image only. **All document bytes** live in one staging folder at repo root — `Documents_Stage/<id>.md` for markdown bodies, `Documents_Stage/<id>.<ext>` for uploaded pdf/image (the collection holds metadata only). Uploaded bytes are served through a **privacy-gated** endpoint, never a static mount (see §6). The single folder is the local stand-in for object storage / GridFS later. |
 
 ### Why a document store (and why the model below is document-shaped)
 
@@ -255,7 +255,7 @@ Each collection below is, in the interim, a JSON file under `local_DB/` containi
   "content": "markdown",                    // default ""; body is stored on disk as Documents_Stage/<id>.md (one file per doc, at repo root) and injected into responses — link docs (url set) have no file
   "linked_task_ids": ["task_id"],           // bidirectional spec <-> issues
   "comments": [ /* same shape as task comments */ ],
-  // A doc created by UPLOADING a pdf/image carries one attachment; its bytes live under uploads/<storage_key> (served read-only at /uploads/<storage_key>) and content is "".
+  // A doc created by UPLOADING a pdf/image carries one attachment; its bytes live in the staging folder (Documents_Stage/<storage_key>) and content is "". Served via GET /documents/{id}/file, which applies the SAME §6 visibility check as the doc — never a static mount.
   "attachments": [ { "kind": "markdown|pdf|image", "storage_key": "string", "filename": "string|null" } ],
   "created_at": "ISO-8601",
   "updated_at": "ISO-8601",
@@ -325,7 +325,7 @@ Because the store (JSON files / MongoDB) enforces nothing, the **backend** is re
 2. **Personal-task privacy.** A task with `space_id == null` is private to its `created_by`. It must appear **only** in that user's "My work" and must never be returned to any other user, in any list or search. A Space's task list is the set with `space_id == <that space>` — so personal tasks are structurally excluded from shared boards.
 3. **`tag_space_id` is a label only.** It may be set only when `space_id == null`. It must never be used to include a task in a Space's task list or expose it to others.
 4. **No cross-visible personal assignment.** A personal task's `assignee_id`, if set, must equal its `created_by`.
-5. **Personal documents.** A document with `space_id == null` is private to `owner_id`; same visibility rule as personal tasks.
+5. **Personal documents.** A document with `space_id == null` is private to `owner_id`; same visibility rule as personal tasks. This extends to its bytes: an uploaded file's serving endpoint (`GET /documents/{id}/file`) must run the same visibility check — never expose document bytes through a static/public mount.
 6. **Status posts.** `kind == "status"` requires a non-null `space_id` and may carry `health`. The General thread (`space_id == null`) holds `message` posts only.
 7. **Goal health rollup.** For a goal, gather its Spaces (`spaces` where the goal is in `goal_ids`), then the **latest** `thread_posts` with `kind == "status"` per Space, and surface each one's `health` + body. If `goals.status` is not set manually, derive it from these.
 8. **Mode is the only branch.** `space.mode` selects default statuses and which affordances show (git/cycles for engineering; cadence for workstream). It introduces no separate collections or task types.
