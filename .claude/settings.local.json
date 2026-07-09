@@ -33,7 +33,31 @@
       "PowerShell($conns = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($conns\\) { $conns.OwningProcess | Select-Object -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force; \"stopped PID $_\" } catch { \"could not stop $_\" } } } else { \"nothing listening on 8000\" })",
       "Bash(python -c \"import ast; [ast.parse\\(open\\(f,encoding='utf-8'\\).read\\(\\),f\\) for f in ['app/config.py','app/main.py','app/doc_files.py','app/routers/documents.py']]; print\\('py syntax ok'\\)\")",
       "PowerShell($c = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c.OwningProcess | Select-Object -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force; \"stopped $_\" } catch {} } } else { \"port 8000 free\" })",
-      "Bash(python -c \"import app.main; routes=[r.path for r in app.main.app.routes]; print\\('imports OK'\\); print\\('has /documents/{doc_id}/file:', '/documents/{doc_id}/file' in routes\\); print\\('has /uploads mount:', any\\('/uploads' in str\\(getattr\\(r,'path',''\\)\\) for r in app.main.app.routes\\)\\)\")"
+      "Bash(python -c \"import app.main; routes=[r.path for r in app.main.app.routes]; print\\('imports OK'\\); print\\('has /documents/{doc_id}/file:', '/documents/{doc_id}/file' in routes\\); print\\('has /uploads mount:', any\\('/uploads' in str\\(getattr\\(r,'path',''\\)\\) for r in app.main.app.routes\\)\\)\")",
+      "Read(//Users/aaryanawadh/projects/**)",
+      "Bash(python3 -c \"import motor, pymongo; print\\('motor', motor.version\\); print\\('pymongo', pymongo.version\\)\")",
+      "Bash(/opt/homebrew/bin/python3 --version)",
+      "Bash(/opt/homebrew/bin/python3.14 --version)",
+      "Bash(/opt/homebrew/bin/python3.14 -m venv .venv)",
+      "Bash(./.venv/bin/python -m pip install --quiet --upgrade pip)",
+      "Bash(./.venv/bin/pip install *)",
+      "Bash(./.venv/bin/python -c \"import motor, pymongo, fastapi, pydantic; print\\('motor', motor.version\\); print\\('pymongo', pymongo.version\\); print\\('fastapi', fastapi.__version__\\)\")",
+      "Bash(./.venv/bin/python -c \"import motor, pymongo; print\\('motor', motor.version\\); print\\('pymongo', pymongo.version\\)\")",
+      "Bash(./.venv/bin/python -c \"import dns; print\\('dnspython', dns.__version__\\)\")",
+      "Bash(./.venv/bin/python -)",
+      "Bash(./.venv/bin/python scripts/DB_init_SCRIPT.py)",
+      "Bash(python -c \"import app.main\")",
+      "Bash(python -c \"import uvicorn; print\\(uvicorn.__version__\\)\")",
+      "Bash(.venv/bin/python -m pip list)",
+      "Bash(.venv/bin/python -m pip install -r requirements.txt)",
+      "Bash(brew install *)",
+      "Bash(rm -rf .venv)",
+      "Bash(/opt/homebrew/opt/python@3.13/bin/python3.13 -m venv .venv)",
+      "Bash(.venv/bin/python --version)",
+      "Bash(.venv/bin/python -m pip install --upgrade pip -q)",
+      "Bash(.venv/bin/python -c \"from app.main import app; print\\('import OK'\\)\")",
+      "Bash(curl -s -X POST http://localhost:8000/spaces -H \"Content-Type: application/json\" -d '{\"name\":\"Smoke test space\",\"mode\":\"workstream\",\"description\":\"created via smoke test\",\"goal_ids\":[]}' -w \"\\\\nHTTP %{http_code}\\\\n\")",
+      "Bash(curl -s -X DELETE http://localhost:8000/spaces/4ec28664-38d3-409e-9c51-adcfac2c26b4 -w \"HTTP %{http_code}\\\\n\")"
     ]
   }
 }

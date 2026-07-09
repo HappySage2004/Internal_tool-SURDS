@@ -183,6 +183,11 @@ export const getPostsBySpace = (spaceId: string | null) =>
   spaceId === null
     ? get<RawPost[]>('/thread-posts')
     : get<RawPost[]>(`/thread-posts?space_id=${spaceId}`)
+export const createSpace = (body: {
+  name: string; mode: string; description?: string; owner_id?: string;
+  member_ids?: string[]; goal_ids?: string[]; update_cadence?: string;
+}) => post<RawSpace>('/spaces', body)
+
 export const getMyWork      = () => get<RawTask[]>('/tasks/my-work')
 export const getTasksBySpace = (spaceId: string) => get<RawTask[]>(`/tasks?space_id=${spaceId}`)
 export const getDocuments   = () => get<RawDoc[]>('/documents')

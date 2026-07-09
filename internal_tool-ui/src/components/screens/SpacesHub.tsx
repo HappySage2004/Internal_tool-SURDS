@@ -11,6 +11,7 @@ import { Button } from '../ui/Button'
 import { ThreadFeed } from '../ui/ThreadFeed'
 import { DocumentViewer } from '../panels/DocumentViewer'
 import { NewDocModal } from '../modals/NewDocModal'
+import { NewSpaceModal } from '../modals/NewSpaceModal'
 
 interface SpacesHubProps {
   onSelectSpace: (spaceId: string) => void
@@ -87,7 +88,7 @@ const RAIL_MIN = 240
 const RAIL_MAX = 640
 
 export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
-  const { spaces, usersById, goalsById, documents, spacesById, threadPostsBySpaceId, addPost, addDocument } = useData()
+  const { spaces, goals, usersById, goalsById, documents, spacesById, threadPostsBySpaceId, addPost, addDocument, addSpace } = useData()
   const engineeringSpaces = spaces.filter(s => s.mode === 'engineering')
   const workstreamSpaces  = spaces.filter(s => s.mode === 'workstream')
   const [localGeneralPosts, setLocalGeneralPosts] = useState<ThreadPost[]>([])
@@ -95,6 +96,7 @@ export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
   const [viewerDoc, setViewerDoc] = useState<Document | null>(null)
   const [viewerEditing, setViewerEditing] = useState(false)
   const [showNewDoc, setShowNewDoc] = useState(false)
+  const [showNewSpace, setShowNewSpace] = useState(false)
 
   function handleRailResizeMouseDown(e: ReactMouseEvent<HTMLDivElement>) {
     e.preventDefault()
@@ -147,7 +149,7 @@ export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
         <div className="px-6 pt-8 pb-12">
           <div className="flex items-center justify-between mb-5">
             <h1 className="text-[21px] font-medium text-[var(--text)]">Spaces</h1>
-            <Button variant="primary" size="sm">
+            <Button variant="primary" size="sm" onClick={() => setShowNewSpace(true)}>
               <Plus size={14} />
               New space
             </Button>
@@ -286,6 +288,19 @@ export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
           />
         </div>
       </div>
+
+      {/* New space modal */}
+      {showNewSpace && (
+        <NewSpaceModal
+          goals={goals}
+          onClose={() => setShowNewSpace(false)}
+          onCreated={(space) => {
+            addSpace(space)
+            setShowNewSpace(false)
+            onSelectSpace(space.id)
+          }}
+        />
+      )}
 
       {/* New doc modal (with space picker) */}
       {showNewDoc && (
