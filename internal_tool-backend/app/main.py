@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import health, users, goals, spaces, tasks, documents, thread_posts, inbox, meetings
+from app.routers import auth, health, users, goals, spaces, tasks, documents, thread_posts, inbox, meetings
 
 app = FastAPI(
     title="Internal tool API",
@@ -18,6 +18,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(auth.router,      prefix="/auth",      tags=["auth"])
 app.include_router(users.router,     prefix="/users",     tags=["users"])
 app.include_router(goals.router,     prefix="/goals",     tags=["goals"])
 app.include_router(spaces.router,    prefix="/spaces",    tags=["spaces"])

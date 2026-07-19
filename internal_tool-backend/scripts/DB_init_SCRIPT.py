@@ -36,6 +36,9 @@ except ImportError:
     sys.exit(1)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BACKEND_DIR))
+
+from app.security import hash_password  # noqa: E402  (needs BACKEND_DIR on path first)
 
 # Every collection the app touches — must stay in sync with
 # app/repositories/factory.py::COLLECTIONS.
@@ -151,12 +154,28 @@ def main() -> int:
         idx_count = 1 + len(SECONDARY_INDEXES.get(name, []))
         print(f"  indexes on '{name}': {idx_count} ensured (unique id + {idx_count - 1} lookup)")
 
-    # 3. Seed users (upsert by id — idempotent).
+    # 3. Seed users (upsert by id — idempotent). password_hash is intentionally
+    #    NOT in the $set, so re-running never clobbers a changed password.
     print()
     users = _seed_users()
     for u in users:
         db["users"].update_one({"id": u["id"]}, {"$set": u}, upsert=True)
     print(f"  seeded {len(users)} users (upserted): {', '.join(u['id'] for u in users)}")
+
+    # 3b. Backfill an initial password for any user missing one. The initial
+    #     password equals the user id (e.g. "aaryan"); users should change it in
+    #     the app. Only fills where absent, so existing passwords are preserved.
+    print()
+    seeded_pw = []
+    for u in db["users"].find({"password_hash": {"$exists": False}}):
+        uid = u["id"]
+        db["users"].update_one({"id": uid}, {"$set": {"password_hash": hash_password(uid)}})
+        seeded_pw.append(uid)
+    if seeded_pw:
+        print(f"  set initial password (== user id) for: {', '.join(seeded_pw)}")
+        print("  → tell each person to sign in with that and change it in the app.")
+    else:
+        print("  all users already have a password — none changed.")
 
     # 4. Drop stray mis-cased 'Users' collection if empty.
     if "Users" in db.list_collection_names() and db["Users"].estimated_document_count() == 0:
@@ -169,7 +188,7 @@ def main() -> int:
         print(f"  {name}: {db[name].estimated_document_count()} documents")
 
     client.close()
-    print(f"\nDone — '{db_name}' initialised. Start the backend with STORAGE_BACKEND=mongo.")
+    print(f"\nDone — '{db_name}' initialised. Start the backend (uvicorn app.main:app).")
     return 0
 
 

@@ -86,6 +86,7 @@ class UserCreate(BaseModel):
     name: str
     email: str
     is_admin: bool = False
+    password: Optional[str] = None  # optional initial password; hashed before storage
 
 
 class UserOut(BaseModel):
@@ -94,6 +95,26 @@ class UserOut(BaseModel):
     email: str
     is_admin: bool
     created_at: str
+    # NB: password_hash is intentionally never included in UserOut.
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    token: str
+    user: UserOut
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 # ---------------------------------------------------------------------------

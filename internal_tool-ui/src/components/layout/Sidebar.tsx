@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import {
   Pencil, Plus, CheckSquare, Target, Layout, CalendarDays,
-  Settings, ChevronDown, ChevronRight,
+  LogOut, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
+import { useAuth } from '../../context/AuthContext'
 import { Avatar } from '../ui/Avatar'
 import { HealthDot } from '../ui/HealthDot'
 import type { Health } from '../../types'
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
 
 export function Sidebar({ currentView, selectedSpaceId, onNavigate, onSelectSpace, onNewTask }: SidebarProps) {
   const { spaces, usersById } = useData()
+  const { userId, logout } = useAuth()
   const [engOpen, setEngOpen] = useState(true)
   const [wsOpen, setWsOpen]   = useState(true)
 
@@ -35,7 +37,7 @@ export function Sidebar({ currentView, selectedSpaceId, onNavigate, onSelectSpac
   const getHealth = (spaceId: string): Health =>
     (spaces.find(s => s.id === spaceId)?.latestStatusPost?.health ?? 'on_track') as Health
 
-  const aaryan = usersById['aaryan']
+  const currentUser = userId ? usersById[userId] : undefined
 
   return (
     <aside
@@ -182,16 +184,19 @@ export function Sidebar({ currentView, selectedSpaceId, onNavigate, onSelectSpac
       </div>
 
       {/* Bottom user row */}
-      <div className="px-3 py-3 border-t border-[var(--border)] flex items-center gap-2">
-        <Avatar user={aaryan} size="sm" />
-        <span className="flex-1 text-[13px] font-medium text-[var(--text)] truncate">{aaryan.name}</span>
-        <button
-          className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[rgba(18,18,28,0.06)] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#5B57E0]"
-          title="Settings"
-        >
-          <Settings size={14} />
-        </button>
-      </div>
+      {currentUser && (
+        <div className="px-3 py-3 border-t border-[var(--border)] flex items-center gap-2">
+          <Avatar user={currentUser} size="sm" />
+          <span className="flex-1 text-[13px] font-medium text-[var(--text)] truncate">{currentUser.name}</span>
+          <button
+            onClick={logout}
+            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[rgba(18,18,28,0.06)] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#5B57E0]"
+            title="Sign out"
+          >
+            <LogOut size={14} />
+          </button>
+        </div>
+      )}
 
     </aside>
   )

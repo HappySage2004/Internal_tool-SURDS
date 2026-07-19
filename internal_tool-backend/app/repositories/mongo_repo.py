@@ -1,7 +1,7 @@
 """
-MongoDB repository — implements the same Repository protocol as JsonRepository.
-Requires: motor (pip install motor)
-Activate: set STORAGE_BACKEND=mongo in .env
+MongoDB repository — implements the Repository protocol defined in base.py.
+This is the only storage backend. Requires: motor (pip install motor).
+Configure the connection via MONGO_URI / MONGO_DB in .env.
 """
 from typing import Any
 

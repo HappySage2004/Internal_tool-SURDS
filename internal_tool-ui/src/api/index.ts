@@ -1,4 +1,4 @@
-import { get, post, patch, postForm, ASSET_BASE } from './client'
+import { get, post, patch, postForm, ASSET_BASE, setToken, clearToken } from './client'
 import type { User, Goal, Space, Task, Document, InboxItem, Meeting, ThreadPost, GitLink, Health } from '../types'
 
 // ─── Raw API shapes (post-camelCase transform, pre-mapping) ──────────────────
@@ -171,6 +171,29 @@ export function mapMeeting(m: RawMeeting): Meeting {
 
 export function mapComment(c: RawComment): import('../types').Comment {
   return { id: c.id, authorId: c.authorId, body: c.body, createdAt: formatRelative(c.createdAt) }
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+export { getToken, clearToken } from './client'
+
+interface RawLogin { token: string; user: RawUser }
+
+/** Log in, persist the session token, and return the raw current user. */
+export async function login(email: string, password: string): Promise<RawUser> {
+  const res = await post<RawLogin>('/auth/login', { email, password })
+  setToken(res.token)
+  return res.user
+}
+
+/** Resolve the current user from the stored token (throws 401 if invalid). */
+export const getMe = () => get<RawUser>('/auth/me')
+
+export const changePassword = (current_password: string, new_password: string) =>
+  post<void>('/auth/change-password', { current_password, new_password })
+
+export function logout(): void {
+  clearToken()
 }
 
 // ─── API functions ────────────────────────────────────────────────────────────

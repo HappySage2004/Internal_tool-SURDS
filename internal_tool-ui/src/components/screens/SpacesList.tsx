@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { spaces, usersById, goalsById } from '../../data/mock'
+import { useData } from '../../context/DataContext'
 import type { Space, SpaceMode } from '../../types'
 import { Avatar } from '../ui/Avatar'
 import { HealthDot } from '../ui/HealthDot'
@@ -14,8 +14,9 @@ interface SpacesListProps {
 type FilterTab = 'all' | 'engineering' | 'workstream'
 
 function SpaceRow({ space, onSelect }: { space: Space; onSelect: () => void }) {
+  const { usersById, goalsById } = useData()
   const owner = space.ownerId ? usersById[space.ownerId] : undefined
-  const health = space.latestUpdate?.health ?? 'on_track'
+  const health = space.latestStatusPost?.health ?? 'on_track'
   const relatedGoals = space.goalIds.map(id => goalsById[id]).filter(Boolean)
 
   return (
@@ -47,9 +48,9 @@ function SpaceRow({ space, onSelect }: { space: Space; onSelect: () => void }) {
 
       <div className="flex items-center gap-3 flex-shrink-0">
         {owner && <Avatar user={owner} size="sm" />}
-        {space.latestUpdate && (
+        {space.latestStatusPost && (
           <span className="mono text-[11px] text-[var(--text-faint)]">
-            updated {space.latestUpdate.createdAt}
+            updated {space.latestStatusPost.createdAt}
           </span>
         )}
       </div>
@@ -58,6 +59,7 @@ function SpaceRow({ space, onSelect }: { space: Space; onSelect: () => void }) {
 }
 
 export function SpacesList({ onSelectSpace }: SpacesListProps) {
+  const { spaces } = useData()
   const [filter, setFilter] = useState<FilterTab>('all')
 
   const filteredSpaces = spaces.filter(s => {

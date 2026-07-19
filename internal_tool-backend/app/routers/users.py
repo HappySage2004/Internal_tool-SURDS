@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.dependencies import get_store
 from app.repositories.store import Store
 from app.schemas.schemas import UserCreate, UserOut
+from app.security import hash_password
 
 router = APIRouter()
 
@@ -20,10 +21,12 @@ async def create_user(body: UserCreate, store: Store = Depends(get_store)):
     doc = {
         "id": str(uuid.uuid4()),
         "name": body.name,
-        "email": body.email,
+        "email": body.email.strip().lower(),
         "is_admin": body.is_admin,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if body.password:
+        doc["password_hash"] = hash_password(body.password)
     return await store.users.insert(doc)
 
 

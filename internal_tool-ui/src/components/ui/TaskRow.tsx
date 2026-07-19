@@ -1,6 +1,6 @@
 import { Lock } from 'lucide-react'
 import type { Task } from '../../types'
-import { usersById, spacesById } from '../../data/mock'
+import { useData } from '../../context/DataContext'
 import { StatusPill } from './StatusPill'
 import { PriorityFlag } from './PriorityFlag'
 import { Avatar } from './Avatar'
@@ -22,6 +22,7 @@ const statusDotColor: Record<string, string> = {
 }
 
 export function TaskRow({ task, onClick, showSpace = false }: TaskRowProps) {
+  const { usersById, spacesById } = useData()
   const isDone = task.status === 'done'
   const isCanceled = task.status === 'canceled'
   const isMuted = isDone || isCanceled

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, KeyboardEvent } from 'react'
 import { Search, Layout, FileText, Plus, CheckSquare, ArrowRight } from 'lucide-react'
-import { spaces, documents } from '../../data/mock'
+import { useData } from '../../context/DataContext'
 
 interface CommandPaletteProps {
   onClose: () => void
@@ -17,6 +17,7 @@ interface CommandItem {
 }
 
 export function CommandPalette({ onClose, onNavigateSpace }: CommandPaletteProps) {
+  const { spaces, documents } = useData()
   const [query, setQuery] = useState('')
   const [activeIdx, setActiveIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)

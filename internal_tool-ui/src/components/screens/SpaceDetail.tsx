@@ -1,6 +1,7 @@
 import { useState, useEffect, type MouseEvent as ReactMouseEvent } from 'react'
 import { GitBranch, GitPullRequest, GitMerge, Plus, Code2, FileText, X, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import { useData } from '../../context/DataContext'
+import { useAuth } from '../../context/AuthContext'
 import * as apiClient from '../../api'
 import { getLinkProvider } from '../../lib/linkProvider'
 import type { Task, TaskStatus, GitLink, ThreadPost, Document } from '../../types'
@@ -54,6 +55,7 @@ const RAIL_MAX = 640
 
 export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
   const { spaces, tasks: myTasks, taskOverrides, usersById, goalsById, documents, threadPostsBySpaceId, addPost, addDocument, refreshSpaceTasks } = useData()
+  const { userId } = useAuth()
   const [spaceTasks, setSpaceTasks] = useState<typeof myTasks>([])
   const [showPostModal, setShowPostModal] = useState(false)
   const [postBody, setPostBody] = useState('')
@@ -156,7 +158,8 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
   }
 
   const handleSendPost = async (body: string) => {
-    const optimistic: ThreadPost = { id: `local-${Date.now()}`, spaceId, authorId: 'aaryan', kind: 'message', body, createdAt: 'just now' }
+    if (!userId) return
+    const optimistic: ThreadPost = { id: `local-${Date.now()}`, spaceId, authorId: userId, kind: 'message', body, createdAt: 'just now' }
     setLocalPosts(prev => [...prev, optimistic])
     try {
       const raw = await apiClient.createPost({ space_id: spaceId, kind: 'message', body })
@@ -165,8 +168,8 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
   }
 
   const handlePostUpdate = async () => {
-    if (!postBody.trim()) return
-    const optimistic: ThreadPost = { id: `local-status-${Date.now()}`, spaceId, authorId: 'aaryan', kind: 'status', body: postBody, health: postHealth, createdAt: 'just now' }
+    if (!postBody.trim() || !userId) return
+    const optimistic: ThreadPost = { id: `local-status-${Date.now()}`, spaceId, authorId: userId, kind: 'status', body: postBody, health: postHealth, createdAt: 'just now' }
     setLocalPosts(prev => [...prev, optimistic])
     setPostBody('')
     setShowPostModal(false)

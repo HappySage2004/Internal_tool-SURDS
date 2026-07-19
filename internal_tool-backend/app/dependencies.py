@@ -1,7 +1,8 @@
-from fastapi import Depends
+from fastapi import Depends, Header, HTTPException
 
 from app.repositories.store import Store
 from app.repositories.factory import create_store
+from app.security import verify_token
 
 # Module-level singleton — created once, reused across all requests.
 _store: Store | None = None
@@ -14,14 +15,27 @@ def get_store() -> Store:
     return _store
 
 
-async def get_current_user(store: Store = Depends(get_store)) -> dict:
+async def get_current_user(
+    store: Store = Depends(get_store),
+    authorization: str | None = Header(default=None),
+) -> dict:
     """
-    Stub: always returns Aaryan.
-    Replace with real JWT/session auth in a later phase — only this
-    function needs to change; all business logic already uses its return value.
+    Resolve the current user from a signed bearer session token
+    (`Authorization: Bearer <token>`). Returns 401 when the token is missing,
+    malformed, expired, or names a user that no longer exists.
+
+    Business logic downstream only ever sees the resolved user dict, so swapping
+    the token scheme for a fuller auth provider later touches only this function.
     """
-    user = await store.users.get("aaryan")
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+
+    user_id = verify_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    user = await store.users.get(user_id)
     if not user:
-        # Fallback if seed data is missing
-        return {"id": "aaryan", "name": "Aaryan", "email": "aaryan@example.com", "is_admin": True}
+        raise HTTPException(status_code=401, detail="Not authenticated")
     return user

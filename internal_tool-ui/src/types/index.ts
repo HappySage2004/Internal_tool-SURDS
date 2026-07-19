@@ -77,8 +77,6 @@ export interface Space {
   ownerId?: string
   goalIds: string[]
   latestStatusPost?: ThreadPost
-  /** @deprecated use latestStatusPost */
-  latestUpdate?: ThreadPost
 }
 
 export interface Document {

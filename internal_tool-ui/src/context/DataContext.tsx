@@ -1,11 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import * as api from '../api'
 import type { User, Goal, Space, Task, Document, InboxItem, Meeting, ThreadPost } from '../types'
-import {
-  users as mockUsers, goals as mockGoals, spaces as mockSpaces,
-  tasks as mockTasks, documents as mockDocuments, inboxItems as mockInbox,
-  meetings as mockMeetings, threadPosts as mockPosts,
-} from '../data/mock'
 
 // ─── Context shape ────────────────────────────────────────────────────────────
 
@@ -50,18 +45,18 @@ const DataContext = createContext<DataState | null>(null)
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  // Seed with mock data so the first render is never blank.
-  // API data replaces these silently once it loads.
-  const [users,       setUsers]       = useState<User[]>(mockUsers)
-  const [goals,       setGoals]       = useState<Goal[]>(mockGoals)
-  const [spaces,      setSpaces]      = useState<Space[]>(mockSpaces)
-  const [tasks,       setTasks]       = useState<Task[]>(mockTasks)
-  const [documents,   setDocuments]   = useState<Document[]>(mockDocuments)
-  const [inboxItems,  setInboxItems]  = useState<InboxItem[]>(mockInbox)
-  const [meetings,    setMeetings]    = useState<Meeting[]>(mockMeetings)
-  const [threadPosts, setThreadPosts] = useState<ThreadPost[]>(mockPosts)
+  // All data comes from the API (backed by MongoDB). Collections start empty and
+  // are populated once load() resolves.
+  const [users,       setUsers]       = useState<User[]>([])
+  const [goals,       setGoals]       = useState<Goal[]>([])
+  const [spaces,      setSpaces]      = useState<Space[]>([])
+  const [tasks,       setTasks]       = useState<Task[]>([])
+  const [documents,   setDocuments]   = useState<Document[]>([])
+  const [inboxItems,  setInboxItems]  = useState<InboxItem[]>([])
+  const [meetings,    setMeetings]    = useState<Meeting[]>([])
+  const [threadPosts, setThreadPosts] = useState<ThreadPost[]>([])
   const [taskOverrides, setTaskOverrides] = useState<Record<string, Partial<Task>>>({})
-  const [loading,     setLoading]     = useState(false)  // mock data is ready immediately
+  const [loading,     setLoading]     = useState(true)   // fetching from the API on mount
   const [error,       setError]       = useState<string | null>(null)
 
   const load = useCallback(async () => {

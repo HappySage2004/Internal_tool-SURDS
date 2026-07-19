@@ -21,7 +21,7 @@ changing anything:
 
 - **Backend:** FastAPI (Python 3.11+), Pydantic v2 — `internal_tool-backend/`
 - **Frontend:** React + TypeScript, Vite — `internal_tool-ui/`
-- **Storage:** local JSON files in `local_DB/` now; MongoDB later (config flip + one repository impl)
+- **Storage:** MongoDB (database `Internal_tool_DEV`) via the repository pattern — `internal_tool-backend/app/repositories/`
 
 ## Running locally
 
@@ -37,8 +37,9 @@ npm install
 npm run dev
 ```
 
-Copy `.env.example` to `.env` and adjust if needed. On first run the backend
-seeds `local_DB/` from the demo data so no screen is ever blank.
+Copy `.env.example` to `.env` and set `MONGO_URI` / `MONGO_DB`. Initialise the
+database once with `python scripts/DB_init_SCRIPT.py` (creates the collections
+and seeds users); all application data is read from and written to MongoDB.
 
 ## Status
 

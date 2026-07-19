@@ -1,6 +1,7 @@
 import { useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Plus, FileText, BookOpen, Clipboard, Lock, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import { useData } from '../../context/DataContext'
+import { useAuth } from '../../context/AuthContext'
 import * as apiClient from '../../api'
 import { getLinkProvider } from '../../lib/linkProvider'
 import type { Space, DocType, User, Goal, Document, ThreadPost } from '../../types'
@@ -89,6 +90,7 @@ const RAIL_MAX = 640
 
 export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
   const { spaces, goals, usersById, goalsById, documents, spacesById, threadPostsBySpaceId, addPost, addDocument, addSpace } = useData()
+  const { userId } = useAuth()
   const engineeringSpaces = spaces.filter(s => s.mode === 'engineering')
   const workstreamSpaces  = spaces.filter(s => s.mode === 'workstream')
   const [localGeneralPosts, setLocalGeneralPosts] = useState<ThreadPost[]>([])
@@ -120,7 +122,8 @@ export function SpacesHub({ onSelectSpace }: SpacesHubProps) {
   const generalPosts = [...threadPostsBySpaceId(null), ...localGeneralPosts]
 
   const handleSendGeneral = async (body: string) => {
-    const optimistic: ThreadPost = { id: `local-gen-${Date.now()}`, spaceId: null, authorId: 'aaryan', kind: 'message', body, createdAt: 'just now' }
+    if (!userId) return
+    const optimistic: ThreadPost = { id: `local-gen-${Date.now()}`, spaceId: null, authorId: userId, kind: 'message', body, createdAt: 'just now' }
     setLocalGeneralPosts(prev => [...prev, optimistic])
     try {
       const raw = await apiClient.createPost({ space_id: null, kind: 'message', body })

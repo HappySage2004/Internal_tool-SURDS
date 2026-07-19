@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronRight, FileText, Lock, Inbox,
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
+import { useAuth } from '../../context/AuthContext'
 import type { Task, InboxItemType } from '../../types'
 import { TaskRow } from '../ui/TaskRow'
 import { Badge } from '../ui/Badge'
@@ -69,8 +70,9 @@ function TaskGroup({ label, taskList, onSelectTask }: TaskGroupProps) {
 
 export function MyWork({ onSelectTask, onNewTask }: MyWorkProps) {
   const { tasks, inboxItems, documents, spacesById, markRead } = useData()
-  const myTasks    = tasks.filter(t => t.assigneeId === 'aaryan' || t.isPersonal)
-  const aaryanDocs = documents.filter(d => d.ownerId === 'aaryan')
+  const { userId } = useAuth()
+  const myTasks = tasks.filter(t => t.assigneeId === userId || t.isPersonal)
+  const myDocs  = documents.filter(d => d.ownerId === userId)
   const [inboxOpen, setInboxOpen] = useState(true)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -176,7 +178,7 @@ export function MyWork({ onSelectTask, onNewTask }: MyWorkProps) {
         <section>
           <h2 className="text-[15px] font-medium text-[var(--text)] mb-3">Recent docs</h2>
           <div className="space-y-0.5">
-            {aaryanDocs.map(doc => {
+            {myDocs.map(doc => {
               const space = doc.spaceId ? spacesById[doc.spaceId] : undefined
               return (
                 <div

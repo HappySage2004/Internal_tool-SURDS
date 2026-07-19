@@ -28,7 +28,7 @@ A fast, minimal internal tool for a startup under 10 people. It unifies tasks, d
 ## 3. Stack
 
 - **Frontend:** React (TypeScript recommended so types mirror the API). Vite dev server.
-- **Backend:** FastAPI (Python 3.11+), Pydantic v2 for request/response models and validation.
+- **Backend:** FastAPI (Python 3.11–3.13; **not** 3.14 — the pinned `pydantic==2.9.2` has no 3.14 wheels and its Rust build fails on PyO3), Pydantic v2 for request/response models and validation.
 - **Storage now:** local JSON files in `local_DB/` — one file per collection, each an array of documents matching design §5.
 - **Storage target:** MongoDB (preferred). **Fallback:** PostgreSQL. The migration is a config flip plus one repository implementation (see §9).
 - **Files:** markdown / PDF / image only. **All document bytes live in one staging folder** — `Documents_Stage/<id>.md` for markdown bodies, `Documents_Stage/<id>.<ext>` for uploaded pdf/image — at repo root. The collection record holds metadata only; the markdown body is injected on read, and uploaded bytes are served through a **privacy-gated** endpoint (`GET /documents/{id}/file`), never a static mount, so §6 personal-doc privacy holds for files too. Link bookmarks carry a `url` and have no file. Config: `DOCUMENTS_STAGE_PATH`. (This single folder is the local stand-in for object storage / GridFS on migration.)
@@ -131,13 +131,21 @@ FRONTEND_ORIGIN=http://localhost:5173
 
 Run:
 ```
-# backend
-cd backend && pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+# backend — use Python 3.11–3.13 (NOT 3.14; pydantic 2.9.2 has no 3.14 wheels).
+# On macOS the stock `python3` may be too old (3.9) and `python@3.14` too new,
+# so pin an interpreter explicitly, e.g.:  brew install python@3.13
+cd backend
+python3.13 -m venv .venv          # create the venv with a supported interpreter
+source .venv/bin/activate         # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000   # or: .venv/bin/uvicorn ... without activating
 
 # frontend
 cd frontend && npm install && npm run dev   # serves on :5173, proxies API to :8000
 ```
+If you recreate `.venv`, use Python 3.11–3.13. A 3.14 venv silently fails to install
+`pydantic-core` (leaving `uvicorn` absent → "command not found"); delete `.venv` and
+recreate it with a supported interpreter.
 
 Seed `local_DB/` from the demo data in `UI.md` §9 on first run if the files are empty, so no screen is ever blank.
 

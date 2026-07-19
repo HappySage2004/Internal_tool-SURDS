@@ -8,6 +8,7 @@ import { Avatar } from '../ui/Avatar'
 import { StatusPill } from '../ui/StatusPill'
 import { Badge } from '../ui/Badge'
 import { useData } from '../../context/DataContext'
+import { useAuth } from '../../context/AuthContext'
 import * as api from '../../api'
 
 interface TaskDetailProps {
@@ -77,7 +78,8 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const isPersonal = !spaceId
   const tagSpace = task?.tagSpaceId ? spacesById[task.tagSpaceId] : undefined
   const isEngineering = space?.mode === 'engineering'
-  const currentUser = usersById['aaryan']
+  const { userId } = useAuth()
+  const currentUser = userId ? usersById[userId] : undefined
 
   if (!task && loadingFull) return null
 

@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from app.config import settings
 from app.repositories.store import Store
 
@@ -10,20 +8,12 @@ COLLECTIONS = [
 
 
 def create_store() -> Store:
-    backend = settings.storage_backend.lower()
+    """Build the Store backed by MongoDB. All data lives in Mongo — there is no
+    local-JSON fallback. Configure via MONGO_URI / MONGO_DB in .env."""
+    from motor.motor_asyncio import AsyncIOMotorClient
+    from app.repositories.mongo_repo import MongoRepository
 
-    if backend == "json":
-        from app.repositories.json_repo import JsonRepository
-        base = Path(settings.local_db_path)
-        repos = {name: JsonRepository(base / f"{name}.json") for name in COLLECTIONS}
-        return Store(**repos)
-
-    elif backend == "mongo":
-        from motor.motor_asyncio import AsyncIOMotorClient
-        from app.repositories.mongo_repo import MongoRepository
-        client = AsyncIOMotorClient(settings.mongo_uri)
-        db = client[settings.mongo_db]
-        repos = {name: MongoRepository(db[name]) for name in COLLECTIONS}
-        return Store(**repos)
-
-    raise ValueError(f"Unknown STORAGE_BACKEND: {backend!r}. Choose 'json' or 'mongo'.")
+    client = AsyncIOMotorClient(settings.mongo_uri)
+    db = client[settings.mongo_db]
+    repos = {name: MongoRepository(db[name]) for name in COLLECTIONS}
+    return Store(**repos)

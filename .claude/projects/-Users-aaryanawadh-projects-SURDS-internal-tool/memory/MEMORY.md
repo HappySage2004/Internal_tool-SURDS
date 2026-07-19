@@ -1,0 +1,2 @@
+- [Blank screen fragility](blank-screen-fragility.md) — no error boundary + empty-first-render assumptions mean one throw blanks the whole app
+- [Auth setup](auth-setup.md) — per-user login (bearer token, PBKDF2, initial password == user id, set_password.py); set SECRET_KEY
