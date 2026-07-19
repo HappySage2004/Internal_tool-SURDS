@@ -333,6 +333,10 @@ Because the store (JSON files / MongoDB) enforces nothing, the **backend** is re
 10. **Enums are closed.** Reject values outside the sets in §3.
 11. **Referential cleanup.** Deleting/archiving a Space must handle its tasks, docs, and thread posts (cascade or reassign); converting a meeting action item creates a real task and stores its `task_id` back on the item.
 12. **Completion.** Setting `status` to `done` sets `completed_at`; a merged git link advances the task to `done`; an opened PR advances `todo`/`in_progress` to `in_review`.
+13. **Sub-tasks are one level deep.** A task with a non-null `parent_task_id` is a *sub-task* and may itself never be a parent. Reject creating a sub-task under a task that already has a `parent_task_id` (`409`), and reject re-parenting a task that already has sub-tasks. There is exactly one level of nesting.
+14. **Sub-tasks inherit their parent's scope.** A sub-task's `space_id`, its shared/personal nature, and (for personal parents) its `created_by` are taken from the parent, not the client — a sub-task's `space_id` must always equal its parent's. A sub-task of a personal task is itself personal, owned by the same user; a sub-task of a shared task is shared in the same Space. This makes the §6 privacy rules (2–5) hold for sub-tasks with no special-casing: they flow through the same visibility filter as any task. The parent must be visible to the creator.
+15. **Sub-task cascade.** Canceling a parent task cancels its open (non-`done`, non-`canceled`) sub-tasks. Sub-tasks are otherwise ordinary tasks for referential cleanup (rule 11) — a Space's cascade treats them like any other task in the Space.
+16. **Parent status is not derived.** A parent's `status` is never computed from its sub-tasks; completing every sub-task does *not* auto-complete the parent. Sub-task progress is display-only (`done / total`).
 
 ---
 

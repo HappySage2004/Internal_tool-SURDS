@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   X, Lock, GitBranch, GitPullRequest, GitMerge,
-  MessageSquare, Hash,
+  MessageSquare, Hash, CornerUpLeft, Trash2,
 } from 'lucide-react'
 import type { TaskStatus, TaskPriority, Comment, Task, GitLink } from '../../types'
 import { Avatar } from '../ui/Avatar'
@@ -14,6 +14,8 @@ import * as api from '../../api'
 interface TaskDetailProps {
   taskId: string
   onClose: () => void
+  // Retarget the panel to another task (parent breadcrumb / a sub-task row).
+  onSelectTask?: (taskId: string) => void
 }
 
 const ALL_STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']
@@ -28,7 +30,7 @@ const STATUS_COLORS: Record<TaskStatus, string> = {
   canceled:    '#A1A1AA',
 }
 
-export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
+export function TaskDetail({ taskId, onClose, onSelectTask }: TaskDetailProps) {
   const { tasksById, usersById, spacesById, spaces, users, updateTask: ctxUpdateTask } = useData()
 
   // Seed from context cache; overwritten once full fetch resolves
@@ -53,10 +55,22 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   // Full task from the fetch — authoritative for key/tag/git-links even when the
   // task isn't in the current user's my-work cache (e.g. assigned to someone else).
   const [fetchedTask, setFetchedTask] = useState<Task | undefined>(cached)
+  // Sub-tasks (one level, §6 #13). A sub-task itself shows a parent breadcrumb
+  // instead of a Subtasks section.
+  const [subtasks, setSubtasks] = useState<Task[]>([])
+  const [parentTask, setParentTask] = useState<Task | undefined>(undefined)
+
+  const loadSubtasks = useCallback(() => {
+    api.getSubtasks(taskId)
+      .then(rows => setSubtasks(rows.map(api.mapTask)))
+      .catch(console.error)
+  }, [taskId])
 
   // Fetch full task (description + comments) whenever taskId changes
   useEffect(() => {
     setLoadingFull(true)
+    setSubtasks([])
+    setParentTask(undefined)
     api.getTask(taskId).then(raw => {
       setTitle(raw.title)
       setStatus(raw.status as TaskStatus)
@@ -69,8 +83,15 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
       const mapped = api.mapTask(raw)
       setFetchedTask(mapped)
       setGitLinks(mapped.gitLinks ?? [])
+      if (mapped.parentTaskId) {
+        // This is a sub-task — resolve the parent for the breadcrumb.
+        api.getTask(mapped.parentTaskId).then(p => setParentTask(api.mapTask(p))).catch(console.error)
+      } else {
+        // A top-level task — load its sub-tasks.
+        loadSubtasks()
+      }
     }).catch(console.error).finally(() => setLoadingFull(false))
-  }, [taskId])
+  }, [taskId, loadSubtasks])
 
   const task = fetchedTask ?? cached
   const assignee = assigneeId ? usersById[assigneeId] : undefined
@@ -80,6 +101,8 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const isEngineering = space?.mode === 'engineering'
   const { userId } = useAuth()
   const currentUser = userId ? usersById[userId] : undefined
+  const isSubtask = !!task?.parentTaskId
+  const doneSubtaskCount = subtasks.filter(s => s.status === 'done').length
 
   if (!task && loadingFull) return null
 
@@ -190,6 +213,26 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
     saveField({ description })
   }
 
+  // ── Sub-tasks (read-only here; creation happens from the board "+") ───────────
+
+  const handleToggleSubtask = (sub: Task) => {
+    const next: TaskStatus = sub.status === 'done' ? 'todo' : 'done'
+    setSubtasks(prev => prev.map(s => s.id === sub.id ? { ...s, status: next } : s))
+    ctxUpdateTask(sub.id, { status: next })
+    api.updateTask(sub.id, { status: next }).catch(e => {
+      console.error(e)
+      setSubtasks(prev => prev.map(s => s.id === sub.id ? { ...s, status: sub.status } : s))
+    })
+  }
+
+  const handleRemoveSubtask = (sub: Task) => {
+    setSubtasks(prev => prev.filter(s => s.id !== sub.id))
+    api.cancelTask(sub.id).catch(e => {
+      console.error(e)
+      setSubtasks(prev => [...prev, sub])
+    })
+  }
+
   // @mention detection and autocomplete
   const handleCommentInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
@@ -253,6 +296,18 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           <div className="px-5 pt-5 pb-8">
+            {/* Parent breadcrumb — shown when this task is a sub-task (§6 #13) */}
+            {isSubtask && parentTask && (
+              <button
+                onClick={() => onSelectTask?.(parentTask.id)}
+                className="flex items-center gap-1.5 mb-3 text-[12px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#5B57E0] rounded"
+              >
+                <CornerUpLeft size={12} />
+                {parentTask.key && <span className="mono text-[11px]">{parentTask.key}</span>}
+                <span className="truncate max-w-[320px]">{parentTask.title}</span>
+              </button>
+            )}
+
             {/* Title */}
             <input
               value={title}
@@ -330,34 +385,36 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
                 )}
               </div>
 
-              {/* Priority */}
-              <div className="flex items-center px-3 py-2.5">
-                <span className="text-[12px] text-[var(--text-muted)] w-24 flex-shrink-0">Priority</span>
-                <div className="flex items-center gap-1.5">
-                  {priority ? (
-                    ALL_PRIORITIES.map(p => (
+              {/* Priority — sub-tasks only carry status/assignee/due date */}
+              {!isSubtask && (
+                <div className="flex items-center px-3 py-2.5">
+                  <span className="text-[12px] text-[var(--text-muted)] w-24 flex-shrink-0">Priority</span>
+                  <div className="flex items-center gap-1.5">
+                    {priority ? (
+                      ALL_PRIORITIES.map(p => (
+                        <button
+                          key={p}
+                          onClick={() => handlePriorityChange(p)}
+                          className={`text-[12px] px-2 py-0.5 rounded border transition-all duration-150 ${
+                            priority === p
+                              ? 'border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent)]'
+                              : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))
+                    ) : (
                       <button
-                        key={p}
-                        onClick={() => handlePriorityChange(p)}
-                        className={`text-[12px] px-2 py-0.5 rounded border transition-all duration-150 ${
-                          priority === p
-                            ? 'border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent)]'
-                            : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]'
-                        }`}
+                        onClick={() => handlePriorityChange('medium')}
+                        className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text)] transition-colors"
                       >
-                        {p}
+                        + Add priority
                       </button>
-                    ))
-                  ) : (
-                    <button
-                      onClick={() => handlePriorityChange('medium')}
-                      className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text)] transition-colors"
-                    >
-                      + Add priority
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Due date */}
               <div className="flex items-center px-3 py-2.5">
@@ -380,7 +437,8 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
                 </div>
               </div>
 
-              {/* Space */}
+              {/* Space — hidden for sub-tasks (they inherit the parent's space) */}
+              {!isSubtask && (
               <div className="flex items-center px-3 py-2.5 relative">
                 <span className="text-[12px] text-[var(--text-muted)] w-24 flex-shrink-0">Space</span>
                 <button
@@ -427,23 +485,76 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
                   </div>
                 )}
               </div>
+              )}
             </div>
 
-            {/* Description */}
-            <div className="mb-5">
-              <p className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider mb-2">Description</p>
-              <textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                onBlur={handleDescriptionBlur}
-                placeholder="Add a description..."
-                rows={4}
-                className="w-full text-[13px] text-[var(--text)] bg-transparent resize-none border border-[var(--border)] rounded-[6px] p-3 placeholder:text-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#5B57E0] transition-all duration-150"
-              />
-            </div>
+            {/* Description — hidden for sub-tasks */}
+            {!isSubtask && (
+              <div className="mb-5">
+                <p className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider mb-2">Description</p>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  onBlur={handleDescriptionBlur}
+                  placeholder="Add a description..."
+                  rows={4}
+                  className="w-full text-[13px] text-[var(--text)] bg-transparent resize-none border border-[var(--border)] rounded-[6px] p-3 placeholder:text-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#5B57E0] transition-all duration-150"
+                />
+              </div>
+            )}
 
-            {/* Git links */}
-            {isEngineering && (
+            {/* Sub-tasks — read-only list on top-level tasks (one level, §6 #13).
+                Creating a sub-task happens from the "+" on a board task row. */}
+            {!isSubtask && subtasks.length > 0 && (
+              <div className="mb-5">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <p className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider">Subtasks</p>
+                  <span className="mono text-[11px] text-[var(--text-faint)]">{doneSubtaskCount}/{subtasks.length}</span>
+                </div>
+
+                <div className="space-y-0.5">
+                    {subtasks.map(sub => {
+                      const subAssignee = sub.assigneeId ? usersById[sub.assigneeId] : undefined
+                      const subDone = sub.status === 'done'
+                      const subCanceled = sub.status === 'canceled'
+                      return (
+                        <div key={sub.id} className="group flex items-center gap-2 py-1 pl-1 rounded-[6px] hover:bg-[rgba(18,18,28,0.04)] transition-colors">
+                          {/* Toggle done */}
+                          <button
+                            onClick={() => handleToggleSubtask(sub)}
+                            aria-label={subDone ? 'Mark not done' : 'Mark done'}
+                            className="flex-shrink-0 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all focus:outline-none focus:ring-2 focus:ring-[#5B57E0]"
+                            style={{
+                              borderColor: subDone ? '#157F4B' : 'var(--text-faint)',
+                              backgroundColor: subDone ? '#157F4B' : 'transparent',
+                            }}
+                          />
+                          {/* Title → open the sub-task */}
+                          <button
+                            onClick={() => onSelectTask?.(sub.id)}
+                            className={`flex-1 text-left text-[13px] truncate transition-colors hover:text-[var(--accent)] ${
+                              subDone || subCanceled ? 'line-through text-[var(--text-faint)]' : 'text-[var(--text)]'
+                            }`}
+                          >
+                            {sub.title}
+                          </button>
+                          {subAssignee && <Avatar user={subAssignee} size="sm" />}
+                          <button
+                            onClick={() => handleRemoveSubtask(sub)}
+                            aria-label="Remove subtask"
+                            className="flex-shrink-0 p-1 rounded text-[var(--text-faint)] opacity-0 group-hover:opacity-100 hover:text-[#C53434] transition-all focus:outline-none focus:ring-2 focus:ring-[#5B57E0]"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Git links — hidden for sub-tasks */}
+            {isEngineering && !isSubtask && (
               <div className="mb-5">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider">Git links</p>
@@ -538,7 +649,8 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
               </div>
             )}
 
-            {/* Comments */}
+            {/* Comments — hidden for sub-tasks (no dedicated thread) */}
+            {!isSubtask && (
             <div className="mb-6">
               <p className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider mb-3">
                 Comments{comments.length > 0 && <span className="mono ml-1">({comments.length})</span>}
@@ -595,18 +707,21 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-[var(--border)] flex items-center justify-between flex-shrink-0">
           <span className="text-[12px] text-[var(--text-faint)]">
-            {isPersonal ? 'Private task' : space ? space.name : 'Shared'}
+            {isSubtask ? 'Subtask' : isPersonal ? 'Private task' : space ? space.name : 'Shared'}
           </span>
-          <div className="flex items-center gap-1.5 text-[12px] text-[var(--text-faint)]">
-            <MessageSquare size={12} />
-            <span className="mono">{comments.length} comment{comments.length !== 1 ? 's' : ''}</span>
-          </div>
+          {!isSubtask && (
+            <div className="flex items-center gap-1.5 text-[12px] text-[var(--text-faint)]">
+              <MessageSquare size={12} />
+              <span className="mono">{comments.length} comment{comments.length !== 1 ? 's' : ''}</span>
+            </div>
+          )}
         </div>
       </div>
     </>

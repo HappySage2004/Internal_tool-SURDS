@@ -220,6 +220,7 @@ class TaskCreate(BaseModel):
     priority: Optional[TaskPriority] = None
     due_date: Optional[str] = None        # YYYY-MM-DD string
     tag_space_id: Optional[str] = None
+    parent_task_id: Optional[str] = None  # set to create a sub-task (one level only, §6 #13/#14)
 
 
 class TaskUpdate(BaseModel):
@@ -258,6 +259,7 @@ class TaskOut(BaseModel):
     priority: Optional[str] = None
     due_date: Optional[str] = None
     tag_space_id: Optional[str] = None
+    parent_task_id: Optional[str] = None
     git_links: list[GitLinkOut] = []
     comments: list[CommentOut] = []
     created_by: Optional[str] = None

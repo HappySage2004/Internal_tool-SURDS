@@ -87,7 +87,19 @@
       "Bash(.venv/bin/uvicorn app.main:app --port 8001 --log-level warning)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('  password_hash present in any user:', any\\('password_hash' in u or 'passwordHash' in u for u in d\\)\\)\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:8000/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"x\",\"password\":\"y\"}')",
-      "Bash(node -e \"console.log\\('node', process.version, '| global WebSocket:', typeof WebSocket\\)\")"
+      "Bash(node -e \"console.log\\('node', process.version, '| global WebSocket:', typeof WebSocket\\)\")",
+      "Bash(rm -f \"/Users/aaryanawadh/projects/SURDS-internal_tool/.claude/projects/-Users-aaryanawadh-projects-SURDS-internal-tool/memory/subtasks-feature-plan.md\")",
+      "Bash(rmdir -p \"/Users/aaryanawadh/projects/SURDS-internal_tool/.claude/projects/-Users-aaryanawadh-projects-SURDS-internal-tool/memory\")",
+      "Bash(python3.13 -m venv .venv)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python -c \"import pytest, fastapi, httpx; print\\('ok'\\)\")",
+      "Bash(.venv/bin/python -m pytest tests/ -q)",
+      "Bash(PYTHONPATH=. .venv/bin/python /tmp/mongo_ping.py)",
+      "Bash(rm -f /tmp/mongo_ping.py /tmp/e2e_subtasks.py /tmp/e2e_subtasks2.py; echo \"cleaned\")",
+      "Bash(echo \"exit: $?\")"
+    ],
+    "additionalDirectories": [
+      "/private/tmp"
     ]
   }
 }

@@ -50,7 +50,7 @@ COLLECTIONS = [
 # Extra (non-unique) lookup indexes that match the app's hottest query paths.
 # `id` gets a UNIQUE index for every collection automatically (see below).
 SECONDARY_INDEXES: dict[str, list[str]] = {
-    "tasks":        ["space_id", "assignee_id", "created_by", "status"],
+    "tasks":        ["space_id", "assignee_id", "created_by", "status", "parent_task_id"],
     "spaces":       ["mode", "owner_id"],
     "documents":    ["space_id", "owner_id"],
     "thread_posts": ["space_id", "kind"],

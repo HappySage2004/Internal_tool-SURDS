@@ -70,6 +70,9 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
   const [showDocModal, setShowDocModal] = useState(false)
   const [viewerDoc, setViewerDoc] = useState<Document | null>(null)
   const [viewerEditing, setViewerEditing] = useState(false)
+  // Inline "add sub-task" input: the parent id it's open under, plus its draft title.
+  const [addingSubtaskFor, setAddingSubtaskFor] = useState<string | null>(null)
+  const [subtaskTitle, setSubtaskTitle] = useState('')
 
   function handleRailResizeMouseDown(e: ReactMouseEvent<HTMLDivElement>) {
     e.preventDefault()
@@ -117,11 +120,35 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
   const relatedGoals = space.goalIds.map(id => goalsById[id]).filter(Boolean)
   const threadPostsData = [...threadPostsBySpaceId(spaceId), ...localPosts]
 
-  // Group tasks by status
+  // Sub-tasks (one level, §6 #13) are shown indented under their parent, not as
+  // their own board rows. Group only top-level tasks by status; children hang off
+  // their parent regardless of the child's own status.
+  const childrenByParent: Record<string, Task[]> = {}
+  for (const t of effectiveTasks) {
+    if (t.parentTaskId) {
+      (childrenByParent[t.parentTaskId] ??= []).push(t)
+    }
+  }
   const tasksByStatus: Partial<Record<TaskStatus, Task[]>> = {}
   for (const t of effectiveTasks) {
+    if (t.parentTaskId) continue           // rendered nested under its parent
     if (!tasksByStatus[t.status]) tasksByStatus[t.status] = []
     tasksByStatus[t.status]!.push(t)
+  }
+
+  const handleAddSubtask = async (parentId: string) => {
+    const title = subtaskTitle.trim()
+    // Clear first so an Enter-then-blur can't double-submit (blur sees an empty title).
+    setSubtaskTitle('')
+    setAddingSubtaskFor(null)
+    if (!title) return
+    try {
+      // space_id is inherited from the parent server-side (§6 #14).
+      const raw = await apiClient.createTask({ title, parent_task_id: parentId, status: 'todo' })
+      setSpaceTasks(prev => [apiClient.mapTask(raw), ...prev])
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   const handleAddTask = async () => {
@@ -252,18 +279,49 @@ export function SpaceDetail({ spaceId, onSelectTask }: SpaceDetailProps) {
                     <span className="mono text-[11px] text-[var(--text-faint)]">{group.length}</span>
                   </div>
                   <div className="space-y-0.5">
-                    {group.map(task => (
-                      <div key={task.id}>
-                        <TaskRow task={task} onClick={onSelectTask} />
-                        {space.mode === 'engineering' && task.gitLinks && task.gitLinks.length > 0 && (
-                          <div className="flex items-center gap-1.5 pl-[52px] pb-1">
-                            {task.gitLinks.map(link => (
-                              <GitBadge key={link.id} link={link} />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    {group.map(task => {
+                      const kids = childrenByParent[task.id] ?? []
+                      const doneKids = kids.filter(k => k.status === 'done').length
+                      const adding = addingSubtaskFor === task.id
+                      return (
+                        <div key={task.id}>
+                          <TaskRow
+                            task={task}
+                            onClick={onSelectTask}
+                            progress={kids.length ? { done: doneKids, total: kids.length } : undefined}
+                            onAddSubtask={() => { setSubtaskTitle(''); setAddingSubtaskFor(task.id) }}
+                          />
+                          {space.mode === 'engineering' && task.gitLinks && task.gitLinks.length > 0 && (
+                            <div className="flex items-center gap-1.5 pl-[52px] pb-1">
+                              {task.gitLinks.map(link => (
+                                <GitBadge key={link.id} link={link} />
+                              ))}
+                            </div>
+                          )}
+                          {(kids.length > 0 || adding) && (
+                            <div className="ml-5 pl-2 border-l border-[var(--border)]">
+                              {kids.map(kid => (
+                                <TaskRow key={kid.id} task={kid} onClick={onSelectTask} />
+                              ))}
+                              {adding && (
+                                <input
+                                  autoFocus
+                                  value={subtaskTitle}
+                                  onChange={e => setSubtaskTitle(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') handleAddSubtask(task.id)
+                                    if (e.key === 'Escape') { setSubtaskTitle(''); setAddingSubtaskFor(null) }
+                                  }}
+                                  onBlur={() => handleAddSubtask(task.id)}
+                                  placeholder="Subtask title… (↵ to add, Esc to cancel)"
+                                  className="my-1 w-full text-[13px] bg-transparent border border-[var(--border)] rounded-[6px] px-3 py-1.5 outline-none placeholder:text-[var(--text-faint)] text-[var(--text)] focus:ring-2 focus:ring-[#5B57E0] transition-all"
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )

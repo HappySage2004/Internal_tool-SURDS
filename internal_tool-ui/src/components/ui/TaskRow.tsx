@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react'
+import { Lock, ListTree, CornerDownRight, Plus } from 'lucide-react'
 import type { Task } from '../../types'
 import { useData } from '../../context/DataContext'
 import { StatusPill } from './StatusPill'
@@ -10,6 +10,12 @@ interface TaskRowProps {
   task: Task
   onClick: (taskId: string) => void
   showSpace?: boolean
+  // Sub-task progress pill shown on a parent row (§6 #16, display-only).
+  progress?: { done: number; total: number }
+  // Parent task title shown as a breadcrumb on a sub-task row (e.g. in My work).
+  parentLabel?: string
+  // When set, a hover "+" appears on the row to add a sub-task under this task.
+  onAddSubtask?: () => void
 }
 
 const statusDotColor: Record<string, string> = {
@@ -21,7 +27,7 @@ const statusDotColor: Record<string, string> = {
   canceled:    '#A1A1AA',
 }
 
-export function TaskRow({ task, onClick, showSpace = false }: TaskRowProps) {
+export function TaskRow({ task, onClick, showSpace = false, progress, parentLabel, onAddSubtask }: TaskRowProps) {
   const { usersById, spacesById } = useData()
   const isDone = task.status === 'done'
   const isCanceled = task.status === 'canceled'
@@ -60,6 +66,14 @@ export function TaskRow({ task, onClick, showSpace = false }: TaskRowProps) {
         </span>
       )}
 
+      {/* Parent breadcrumb (sub-task rows outside their parent's board, e.g. My work) */}
+      {parentLabel && (
+        <span className="flex items-center gap-1 flex-shrink-0 max-w-[160px] text-[12px] text-[var(--text-faint)] truncate">
+          <CornerDownRight size={11} className="flex-shrink-0" />
+          <span className="truncate">{parentLabel}</span>
+        </span>
+      )}
+
       {/* Title */}
       <span
         className={`flex-1 truncate text-[14px] ${
@@ -68,6 +82,17 @@ export function TaskRow({ task, onClick, showSpace = false }: TaskRowProps) {
       >
         {task.title}
       </span>
+
+      {/* Sub-task progress (display-only) */}
+      {progress && progress.total > 0 && (
+        <span
+          className="flex-shrink-0 flex items-center gap-1 mono text-[11px] text-[var(--text-faint)]"
+          title={`${progress.done} of ${progress.total} subtasks done`}
+        >
+          <ListTree size={11} />
+          {progress.done}/{progress.total}
+        </span>
+      )}
 
       {/* Space or personal badge */}
       {showSpace && (space || task.isPersonal) && (
@@ -93,6 +118,18 @@ export function TaskRow({ task, onClick, showSpace = false }: TaskRowProps) {
         <span className="flex-shrink-0">
           <PriorityFlag priority={task.priority} size={14} />
         </span>
+      )}
+
+      {/* Add sub-task ("+") — appears on hover */}
+      {onAddSubtask && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onAddSubtask() }}
+          aria-label="Add subtask"
+          title="Add subtask"
+          className="flex-shrink-0 p-0.5 rounded text-[var(--text-faint)] opacity-0 group-hover:opacity-100 hover:text-[var(--accent)] hover:bg-[rgba(18,18,28,0.06)] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#5B57E0] focus:opacity-100"
+        >
+          <Plus size={14} />
+        </button>
       )}
 
       {/* Assignee avatar */}

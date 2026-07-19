@@ -21,6 +21,17 @@ def _check_visibility(task: dict, current_user_id: str) -> bool:
     return task.get("created_by") == current_user_id  # personal — owner only
 
 
+async def _cascade_cancel_subtasks(store: Store, parent_id: str, now: str) -> None:
+    """Cancel a parent's open sub-tasks when the parent is canceled (§6 #15).
+
+    Sub-tasks that are already done or canceled are left untouched.
+    """
+    subtasks = await store.tasks.find(parent_task_id=parent_id)
+    for st in subtasks:
+        if st.get("status") not in ("done", "canceled"):
+            await store.tasks.update(st["id"], {"status": "canceled", "updated_at": now})
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -30,6 +41,7 @@ async def list_tasks(
     space_id: str | None = None,
     assignee_id: str | None = None,
     status: str | None = None,
+    parent_task_id: str | None = None,
     store: Store = Depends(get_store),
     current_user: dict = Depends(get_current_user),
 ):
@@ -49,6 +61,11 @@ async def list_tasks(
     # 4. status filter
     if status is not None:
         tasks = [t for t in tasks if t.get("status") == status]
+
+    # 5. parent filter — fetch a parent's sub-tasks. A sub-task inherits its
+    #    parent's space (§6 #14) so it already passes the privacy filter above.
+    if parent_task_id is not None:
+        tasks = [t for t in tasks if t.get("parent_task_id") == parent_task_id]
 
     return tasks
 
@@ -98,26 +115,44 @@ async def create_task(
     store: Store = Depends(get_store),
     current_user: dict = Depends(get_current_user),
 ):
+    data = body.model_dump()
+    parent_task_id = data.pop("parent_task_id", None)
+
+    # Sub-task handling (§6 #13/#14): a sub-task inherits its parent's scope, so we
+    # override any space_id/tag_space_id the client sent from the parent's values.
+    if parent_task_id is not None:
+        parent = await store.tasks.get(parent_task_id)
+        if not parent or not _check_visibility(parent, current_user["id"]):
+            raise HTTPException(status_code=404, detail="Parent task not found")
+        # Invariant 13: one level of nesting only.
+        if parent.get("parent_task_id"):
+            raise HTTPException(
+                status_code=409,
+                detail="Sub-tasks are one level deep — a sub-task cannot have sub-tasks.",
+            )
+        # Invariant 14: inherit the parent's space (and thus its shared/personal nature).
+        data["space_id"] = parent.get("space_id")
+        data["tag_space_id"] = None
+
     # Invariant 1: must be shared or owned
-    if not body.space_id and not current_user["id"]:
+    if not data.get("space_id") and not current_user["id"]:
         raise HTTPException(status_code=400, detail="Task must belong to a space or have an owner.")
 
     # Invariant 3: tag_space_id only on personal tasks
-    if body.tag_space_id and body.space_id:
+    if data.get("tag_space_id") and data.get("space_id"):
         raise HTTPException(
             status_code=400,
             detail="tag_space_id can only be set on personal tasks (space_id must be null).",
         )
 
     # Invariant 4: personal task cannot be assigned to someone else
-    if not body.space_id and body.assignee_id and body.assignee_id != current_user["id"]:
+    if not data.get("space_id") and data.get("assignee_id") and data["assignee_id"] != current_user["id"]:
         raise HTTPException(
             status_code=400,
             detail="A personal task can only be assigned to its owner.",
         )
 
     now = datetime.now(timezone.utc).isoformat()
-    data = body.model_dump()
     # Serialize enums
     if data.get("status") is not None and hasattr(data["status"], "value"):
         data["status"] = data["status"].value
@@ -127,6 +162,7 @@ async def create_task(
     doc = {
         "id": str(uuid4()),
         "key": None,
+        "parent_task_id": parent_task_id,
         **data,
         "git_links": [],
         "comments": [],
@@ -207,7 +243,13 @@ async def update_task(
         elif old_status == "done":
             changes["completed_at"] = None
 
-    return await store.tasks.update(task_id, changes)
+    updated = await store.tasks.update(task_id, changes)
+
+    # §6 #15: canceling a parent cascades to its open sub-tasks.
+    if new_status == "canceled" and old_status != "canceled" and not task.get("parent_task_id"):
+        await _cascade_cancel_subtasks(store, task_id, now)
+
+    return updated
 
 
 @router.delete("/{task_id}", status_code=204)
@@ -222,6 +264,10 @@ async def cancel_task(
 
     now = datetime.now(timezone.utc).isoformat()
     await store.tasks.update(task_id, {"status": "canceled", "updated_at": now})
+
+    # §6 #15: canceling a parent cascades to its open sub-tasks.
+    if not task.get("parent_task_id"):
+        await _cascade_cancel_subtasks(store, task_id, now)
 
 
 # ---------------------------------------------------------------------------

@@ -144,6 +144,7 @@ export default function App() {
         <TaskDetail
           taskId={selectedTaskId}
           onClose={() => setSelectedTaskId(null)}
+          onSelectTask={setSelectedTaskId}
         />
       )}
 

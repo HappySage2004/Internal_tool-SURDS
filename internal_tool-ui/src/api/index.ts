@@ -1,4 +1,4 @@
-import { get, post, patch, postForm, ASSET_BASE, setToken, clearToken } from './client'
+import { get, post, patch, del, postForm, ASSET_BASE, setToken, clearToken } from './client'
 import type { User, Goal, Space, Task, Document, InboxItem, Meeting, ThreadPost, GitLink, Health } from '../types'
 
 // ─── Raw API shapes (post-camelCase transform, pre-mapping) ──────────────────
@@ -9,7 +9,7 @@ interface RawGoal   { id: string; title: string; status?: string; targetDate?: s
 interface RawSpace  { id: string; name: string; mode: string; ownerId?: string; memberIds: string[]; goalIds: string[]; updateCadence?: string; createdAt: string; archivedAt?: string }
 interface RawGitLink { refType: string; url: string; externalId?: string; state?: string }
 interface RawComment { id: string; authorId: string; body: string; parentCommentId?: string; createdAt: string; editedAt?: string | null }
-interface RawTask   { id: string; key?: string; spaceId?: string; title: string; status: string; description?: string; assigneeId?: string; priority?: string; dueDate?: string; tagSpaceId?: string; gitLinks: RawGitLink[]; comments: RawComment[]; createdBy?: string; createdAt: string; updatedAt: string; completedAt?: string }
+interface RawTask   { id: string; key?: string; spaceId?: string; title: string; status: string; description?: string; assigneeId?: string; priority?: string; dueDate?: string; tagSpaceId?: string; parentTaskId?: string; gitLinks: RawGitLink[]; comments: RawComment[]; createdBy?: string; createdAt: string; updatedAt: string; completedAt?: string }
 interface RawAttachment { kind: string; storageKey: string; filename?: string }
 interface RawDoc    { id: string; title: string; ownerId: string; spaceId?: string; docType?: string; content: string; url?: string; attachments?: RawAttachment[]; linkedTaskIds: string[]; createdAt: string; updatedAt: string; archivedAt?: string }
 interface RawPost   { id: string; spaceId: string | null; authorId: string; kind: string; body: string; health?: string; parentPostId?: string; periodLabel?: string; createdAt: string }
@@ -93,7 +93,7 @@ export function mapTask(t: RawTask): Task {
     id: t.id, key: t.key ?? undefined, title: t.title,
     status: t.status as Task['status'], priority: t.priority as Task['priority'],
     assigneeId: t.assigneeId ?? undefined, spaceId: t.spaceId ?? undefined,
-    tagSpaceId: t.tagSpaceId ?? undefined,
+    tagSpaceId: t.tagSpaceId ?? undefined, parentTaskId: t.parentTaskId ?? undefined,
     isPersonal: !t.spaceId, dueGroup: getDueGroup(t.dueDate),
     gitLinks: (t.gitLinks ?? []).map((gl, i): GitLink => ({
       id:         `${t.id}-gl-${i}`,
@@ -237,8 +237,15 @@ export const getMeetings    = () => get<RawMeeting[]>('/meetings')
 // Mutations — tasks
 export const createTask = (body: {
   title: string; space_id?: string; status?: string; assignee_id?: string; priority?: string;
-  due_date?: string;
+  due_date?: string; parent_task_id?: string;
 }) => post<RawTask>('/tasks', body)
+
+// Fetch a parent task's sub-tasks (one level; §6 #13).
+export const getSubtasks = (parentTaskId: string) =>
+  get<RawTask[]>(`/tasks?parent_task_id=${parentTaskId}`)
+
+// Cancel a task (soft — sets status=canceled; cascades to open sub-tasks server-side).
+export const cancelTask = (taskId: string) => del(`/tasks/${taskId}`)
 
 export const getTask = (taskId: string) => get<RawTask>(`/tasks/${taskId}`)
 

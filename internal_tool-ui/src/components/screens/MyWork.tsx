@@ -1,13 +1,16 @@
-import { useState, useRef, KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import {
   AtSign, UserPlus, GitPullRequest, MessageSquare,
-  ChevronDown, ChevronRight, FileText, Lock, Inbox,
+  ChevronDown, ChevronRight, FileText, Image as ImageIcon, Lock, Inbox,
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useAuth } from '../../context/AuthContext'
-import type { Task, InboxItemType } from '../../types'
+import type { Task, InboxItemType, Document } from '../../types'
 import { TaskRow } from '../ui/TaskRow'
 import { Badge } from '../ui/Badge'
+import { DocumentViewer } from '../panels/DocumentViewer'
+import { getLinkProvider } from '../../lib/linkProvider'
+import * as api from '../../api'
 
 interface MyWorkProps {
   onSelectTask: (taskId: string) => void
@@ -41,9 +44,10 @@ interface TaskGroupProps {
   label: string
   taskList: Task[]
   onSelectTask: (id: string) => void
+  parentTitles: Record<string, string>
 }
 
-function TaskGroup({ label, taskList, onSelectTask }: TaskGroupProps) {
+function TaskGroup({ label, taskList, onSelectTask, parentTitles }: TaskGroupProps) {
   const [open, setOpen] = useState(true)
   if (taskList.length === 0) return null
 
@@ -60,7 +64,13 @@ function TaskGroup({ label, taskList, onSelectTask }: TaskGroupProps) {
       {open && (
         <div>
           {taskList.map(t => (
-            <TaskRow key={t.id} task={t} onClick={onSelectTask} showSpace />
+            <TaskRow
+              key={t.id}
+              task={t}
+              onClick={onSelectTask}
+              showSpace
+              parentLabel={t.parentTaskId ? parentTitles[t.parentTaskId] : undefined}
+            />
           ))}
         </div>
       )}
@@ -69,15 +79,40 @@ function TaskGroup({ label, taskList, onSelectTask }: TaskGroupProps) {
 }
 
 export function MyWork({ onSelectTask, onNewTask }: MyWorkProps) {
-  const { tasks, inboxItems, documents, spacesById, markRead } = useData()
+  const { tasks, tasksById, inboxItems, documents, spacesById, markRead } = useData()
   const { userId } = useAuth()
   const myTasks = tasks.filter(t => t.assigneeId === userId || t.isPersonal)
   const myDocs  = documents.filter(d => d.ownerId === userId)
   const [inboxOpen, setInboxOpen] = useState(true)
+  const [viewerDoc, setViewerDoc] = useState<Document | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const unread  = inboxItems.filter(i => !i.read)
   const grouped = groupTasks(myTasks)
+
+  // Resolve parent titles for any sub-tasks in My work (a sub-task's parent may
+  // not itself be in this list), so each sub-task row shows a breadcrumb.
+  const [fetchedParents, setFetchedParents] = useState<Record<string, string>>({})
+  const parentTitles: Record<string, string> = { ...fetchedParents }
+  for (const t of myTasks) {
+    if (t.parentTaskId && tasksById[t.parentTaskId]) {
+      parentTitles[t.parentTaskId] = tasksById[t.parentTaskId].title
+    }
+  }
+  useEffect(() => {
+    const missing = myTasks
+      .map(t => t.parentTaskId)
+      .filter((pid): pid is string => !!pid && !tasksById[pid] && !fetchedParents[pid])
+    if (missing.length === 0) return
+    Promise.all(Array.from(new Set(missing)).map(pid =>
+      api.getTask(pid).then(p => [pid, p.title] as const).catch(() => null)
+    )).then(pairs => {
+      const next: Record<string, string> = {}
+      for (const pair of pairs) if (pair) next[pair[0]] = pair[1]
+      if (Object.keys(next).length) setFetchedParents(prev => ({ ...prev, ...next }))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myTasks.map(t => t.parentTaskId).join(',')])
 
   const handleNewTask = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && newTaskTitle.trim()) {
@@ -168,10 +203,10 @@ export function MyWork({ onSelectTask, onNewTask }: MyWorkProps) {
             <Lock size={12} className="text-[var(--text-faint)] flex-shrink-0" />
           </div>
 
-          <TaskGroup label="Today"     taskList={grouped.today}    onSelectTask={onSelectTask} />
-          <TaskGroup label="This week" taskList={grouped.thisWeek} onSelectTask={onSelectTask} />
-          <TaskGroup label="Later"     taskList={grouped.later}    onSelectTask={onSelectTask} />
-          <TaskGroup label="No date"   taskList={grouped.noDate}   onSelectTask={onSelectTask} />
+          <TaskGroup label="Today"     taskList={grouped.today}    onSelectTask={onSelectTask} parentTitles={parentTitles} />
+          <TaskGroup label="This week" taskList={grouped.thisWeek} onSelectTask={onSelectTask} parentTitles={parentTitles} />
+          <TaskGroup label="Later"     taskList={grouped.later}    onSelectTask={onSelectTask} parentTitles={parentTitles} />
+          <TaskGroup label="No date"   taskList={grouped.noDate}   onSelectTask={onSelectTask} parentTitles={parentTitles} />
         </section>
 
         {/* ── Recent docs ────────────────────────────────────────────── */}
@@ -180,15 +215,19 @@ export function MyWork({ onSelectTask, onNewTask }: MyWorkProps) {
           <div className="space-y-0.5">
             {myDocs.map(doc => {
               const space = doc.spaceId ? spacesById[doc.spaceId] : undefined
-              return (
-                <div
-                  key={doc.id}
-                  className="
-                    flex items-center gap-3 px-3 py-2.5 rounded-[6px] cursor-pointer
-                    hover:bg-[var(--surface)] transition-all duration-150
-                  "
-                >
-                  <FileText size={15} className="text-[var(--text-muted)] flex-shrink-0" />
+              const provider = doc.url ? getLinkProvider(doc.url) : undefined
+              const Icon = provider?.icon ?? (doc.fileKind === 'image' ? ImageIcon : FileText)
+              const rowClass = `
+                flex items-center gap-3 px-3 py-2.5 rounded-[6px] cursor-pointer
+                hover:bg-[var(--surface)] transition-all duration-150
+              `
+              const inner = (
+                <>
+                  <Icon
+                    size={15}
+                    className={provider ? 'flex-shrink-0' : 'text-[var(--text-muted)] flex-shrink-0'}
+                    style={provider ? { color: provider.color } : undefined}
+                  />
                   <span className="flex-1 text-[13px] text-[var(--text)] truncate">{doc.title}</span>
                   {space ? (
                     <Badge variant="default">{space.name}</Badge>
@@ -199,12 +238,32 @@ export function MyWork({ onSelectTask, onNewTask }: MyWorkProps) {
                     </Badge>
                   )}
                   <span className="mono text-[11px] text-[var(--text-faint)] flex-shrink-0">{doc.updatedAt}</span>
-                </div>
+                </>
+              )
+              return doc.url ? (
+                <a key={doc.id} href={doc.url} target="_blank" rel="noreferrer noopener" className={rowClass}>
+                  {inner}
+                </a>
+              ) : (
+                <button
+                  key={doc.id}
+                  onClick={() => setViewerDoc(doc)}
+                  className={`${rowClass} w-full text-left`}
+                >
+                  {inner}
+                </button>
               )
             })}
           </div>
         </section>
       </div>
+
+      {viewerDoc && (
+        <DocumentViewer
+          doc={viewerDoc}
+          onClose={() => setViewerDoc(null)}
+        />
+      )}
     </div>
   )
 }

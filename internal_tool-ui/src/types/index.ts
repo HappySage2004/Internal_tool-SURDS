@@ -51,6 +51,7 @@ export interface Task {
   dueGroup?: 'today' | 'this_week' | 'later'
   spaceId?: string
   tagSpaceId?: string
+  parentTaskId?: string
   isPersonal: boolean
   gitLinks?: GitLink[]
 }
