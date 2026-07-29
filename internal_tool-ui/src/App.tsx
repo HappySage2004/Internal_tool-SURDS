@@ -7,16 +7,17 @@ import { MyWork } from './components/screens/MyWork'
 import { Goals } from './components/screens/Goals'
 import { SpacesHub } from './components/screens/SpacesHub'
 import { SpaceDetail } from './components/screens/SpaceDetail'
+import { Team } from './components/screens/Team'
 import { Meetings } from './components/screens/Meetings'
 import { TaskDetail } from './components/panels/TaskDetail'
 import { MeetingDetail } from './components/panels/MeetingDetail'
 import { QuickCreate, type CreateTaskOpts } from './components/modals/QuickCreate'
 import { CommandPalette } from './components/modals/CommandPalette'
 
-type View = 'my-work' | 'goals' | 'spaces' | 'space-detail' | 'meetings'
+type View = 'my-work' | 'goals' | 'spaces' | 'space-detail' | 'team' | 'meetings'
 
 const NAV_KEY = 'surds.nav'
-const VALID_VIEWS: View[] = ['my-work', 'goals', 'spaces', 'space-detail', 'meetings']
+const VALID_VIEWS: View[] = ['my-work', 'goals', 'spaces', 'space-detail', 'team', 'meetings']
 
 function loadNav(): { view: View; spaceId: string | null } {
   try {
@@ -123,6 +124,10 @@ export default function App() {
           <SpaceDetail spaceId={selectedSpaceId} onSelectTask={setSelectedTaskId} />
         ) : (
           <SpacesHub onSelectSpace={handleSelectSpace} />
+        )
+      case 'team':
+        return (
+          <Team onSelectTask={setSelectedTaskId} onSelectSpace={handleSelectSpace} />
         )
       case 'meetings':
         return (

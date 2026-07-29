@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Pencil, Plus, CheckSquare, Target, Layout, CalendarDays,
+  Pencil, Plus, CheckSquare, Target, Layout, Users, CalendarDays,
   LogOut, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
@@ -9,7 +9,7 @@ import { Avatar } from '../ui/Avatar'
 import { HealthDot } from '../ui/HealthDot'
 import type { Health } from '../../types'
 
-type View = 'my-work' | 'goals' | 'spaces' | 'space-detail' | 'meetings'
+type View = 'my-work' | 'goals' | 'spaces' | 'space-detail' | 'team' | 'meetings'
 
 interface SidebarProps {
   currentView: View
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { id: 'my-work'  as View, label: 'My work',  icon: CheckSquare  },
   { id: 'goals'    as View, label: 'Goals',    icon: Target       },
   { id: 'spaces'   as View, label: 'Spaces',   icon: Layout       },
+  { id: 'team'     as View, label: 'Team',     icon: Users        },
   { id: 'meetings' as View, label: 'Meetings', icon: CalendarDays },
 ]
 

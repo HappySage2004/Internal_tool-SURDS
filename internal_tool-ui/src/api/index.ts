@@ -213,6 +213,9 @@ export const createSpace = (body: {
 
 export const getMyWork      = () => get<RawTask[]>('/tasks/my-work')
 export const getTasksBySpace = (spaceId: string) => get<RawTask[]>(`/tasks?space_id=${spaceId}`)
+// All tasks visible to the current user (§6 privacy applied server-side): every
+// shared task plus only the caller's own personal tasks. Backs the Team view.
+export const getTasks       = () => get<RawTask[]>('/tasks')
 export const getDocuments   = () => get<RawDoc[]>('/documents')
 export const getDocument    = (docId: string) => get<RawDoc>(`/documents/${docId}`)
 
